@@ -11,7 +11,7 @@
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>sfumato</ToolCommandName>
         <PackageOutputPath>./nupkg</PackageOutputPath>
-        <PackageId>argentini.sfumato</PackageId>
+        <PackageId>fynydd.sfumato</PackageId>
         <Authors>Fynydd LLC</Authors>
         <Company>Fynydd Unlimited, Ltd.</Company>
         <PackageTags>Sass;SCSS;CSS;CLI;Responsive;HTML;UI;UX;Framework</PackageTags>
@@ -20,7 +20,7 @@
 
             Install dotnet 8 from https://dotnet.microsoft.com/en-us/download and then install Sfumato with the following command:
             
-            dotnet tool install --global argentini.sfumato
+            dotnet tool install --global fynydd.sfumato
         </Description>
         <Copyright>Copyright (c) Fynydd LLC 2023.</Copyright>
         <PackageProjectUrl>https://github.com/fynydd/Fynydd.Sfumato</PackageProjectUrl>

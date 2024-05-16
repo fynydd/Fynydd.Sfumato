@@ -27,14 +27,14 @@ Sfumato requires that you already have the .NET 8.0 runtime installed, which you
 
 Run the following command in your command line interface (e.g. cmd, PowerShell, Terminal, bash, etc.):
 
-```dotnet tool install --global argentini.sfumato```
+```dotnet tool install --global fynydd.sfumato```
 
 Later you can update Sfumato with the following command:
 
-```dotnet tool update --global argentini.sfumato```
+```dotnet tool update --global fynydd.sfumato```
 
 ## Uninstall
 
 If you need to completely uninstall Sfumato, use the command below:
 
-```dotnet tool uninstall --global argentini.sfumato```
+```dotnet tool uninstall --global fynydd.sfumato```

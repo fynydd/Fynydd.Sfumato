@@ -8,4 +8,4 @@ And Sfumato uses the same class naming convention as Tailwind CSS.
 
 Install dotnet 8 or later from [https://dotnet.microsoft.com/en-us/download](https://dotnet.microsoft.com/en-us/download) and then install Sfumato with the following command:
 
-```dotnet tool install --global argentini.sfumato```
+```dotnet tool install --global fynydd.sfumato```
