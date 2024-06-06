@@ -1,0 +1,32 @@
+@sfumato base;
+@sfumato utilities;
+
+@import "partials/manifest";
+
+@include sf-media($from: $sm-breakpoint) {
+
+    h1 {
+        @apply text-2xl/[1.75] font-bold text-black;
+    }
+}
+
+@include sf-adaptive($mobi-breakpoint) {
+    //.xyzABC {
+    //    color: red;
+    //}
+}
+
+@include sf-dark-theme() {
+
+    //.testclass {
+    //    background-color: blue;
+    //}
+    //
+    //:root {
+    //    background-color: red;
+    //}
+    //
+    //html {
+    //    color: yellow;
+    //}
+}

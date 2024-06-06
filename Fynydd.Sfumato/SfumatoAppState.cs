@@ -4185,6 +4185,7 @@ public sealed class SfumatoAppState
 	(
 		(/[a-z0-9\-\.]{1,250})|([/]?\[[a-zA-Z0-9%',\!/\-\._\:\(\)\\\*\#\$\^\?\+\{\}]{1,250}\])?
 	)
+	(/[a-z0-9\-\.]{1,250})?
 )
 (?=[\s"'`]|[\\"])
 """;
@@ -4411,6 +4412,24 @@ public sealed class SfumatoAppState
     public static string GetWorkingPath()
     {
         var workingPath = Directory.GetCurrentDirectory();
+        
+#if DEBUG
+        var index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Fynydd.Sfumato" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
+
+        if (index > -1)
+        {
+            workingPath = Path.Combine(workingPath[..index], "Fynydd.Sfumato.Tests", "SampleWebsite");
+        }
+
+        else
+        {
+            index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Fynydd.Sfumato.Tests" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
+
+            if (index > -1)
+                workingPath = Path.Combine(workingPath[..index], "Fynydd.Sfumato.Tests", "SampleWebsite");
+        }
+
+#endif
         
         return workingPath;
     }
