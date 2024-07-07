@@ -4193,7 +4193,7 @@ public sealed class SfumatoAppState
 	    CoreClassRegex = new Regex(coreClassExpression.CleanUpIndentedRegex(), RegexOptions.Compiled);
 
 	    const string sfumatoScssRegexExpression = """
-(?<=^|[\s])
+(?<=^|[\s]|;)
 (@sfumato[\s]{1,})
 (
 	([\!\-]?[a-z]{1,25}(\-[a-z0-9\.%]{0,25}){0,5})
@@ -4202,7 +4202,6 @@ public sealed class SfumatoAppState
 	)
 	(([\s]{1,})|([\s]{0,};))
 ){1,}
-(?=[\s])
 """;
 	    
 	    SfumatoScssRegex = new Regex(sfumatoScssRegexExpression.CleanUpIndentedRegex(), RegexOptions.Compiled);
@@ -4414,19 +4413,19 @@ public sealed class SfumatoAppState
         var workingPath = Directory.GetCurrentDirectory();
         
 #if DEBUG
-        var index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Fynydd.Sfumato" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
+        var index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Argentini.Sfumato" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
 
         if (index > -1)
         {
-            workingPath = Path.Combine(workingPath[..index], "Fynydd.Sfumato.Tests", "SampleWebsite");
+            workingPath = Path.Combine(workingPath[..index], "Argentini.Sfumato.Tests", "SampleWebsite");
         }
 
         else
         {
-            index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Fynydd.Sfumato.Tests" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
+            index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Argentini.Sfumato.Tests" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
 
             if (index > -1)
-                workingPath = Path.Combine(workingPath[..index], "Fynydd.Sfumato.Tests", "SampleWebsite");
+                workingPath = Path.Combine(workingPath[..index], "Argentini.Sfumato.Tests", "SampleWebsite");
         }
 
 #endif
