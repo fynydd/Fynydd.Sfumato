@@ -7,6 +7,7 @@ Sfumato is a lean, modern, utility-based CSS framework generation tool. It is co
 - Sfumato provides an optional scalable CSS system that makes all the viewport sizes between breakpoints scale like a PDF for a more controlled layout
 - Theme mode that supports system theme matching, as well as classes that include an "auto" class to fall back to system matching
 - Integrated form element styles (class compatible with Tailwind forms plugin)
+- Supports redirected input for use in automation workflows
 - One install works for all your projects!
 
 ## How To Use
