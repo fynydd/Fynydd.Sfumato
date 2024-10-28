@@ -4413,19 +4413,19 @@ public sealed class SfumatoAppState
         var workingPath = Directory.GetCurrentDirectory();
         
 #if DEBUG
-        var index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Argentini.Sfumato" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
+        var index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Fynydd.Sfumato" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
 
         if (index > -1)
         {
-            workingPath = Path.Combine(workingPath[..index], "Argentini.Sfumato.Tests", "SampleWebsite");
+            workingPath = Path.Combine(workingPath[..index], "Fynydd.Sfumato.Tests", "SampleWebsite");
         }
 
         else
         {
-            index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Argentini.Sfumato.Tests" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
+            index = workingPath.IndexOf(Path.DirectorySeparatorChar + "Fynydd.Sfumato.Tests" + Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.InvariantCulture);
 
             if (index > -1)
-                workingPath = Path.Combine(workingPath[..index], "Argentini.Sfumato.Tests", "SampleWebsite");
+                workingPath = Path.Combine(workingPath[..index], "Fynydd.Sfumato.Tests", "SampleWebsite");
         }
 
 #endif
