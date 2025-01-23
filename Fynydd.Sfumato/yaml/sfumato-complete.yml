@@ -7,8 +7,14 @@
 # One or more project paths:
 # - Path: relative to the location of this file
 # - Extensions: comma separated list of file extensions to watch/process
+# - IgnoreFolders: comma separated list of folder names to ignore
 # - Recurse: watch/process all subdirectories
 ProjectPaths:
+
+    - Path: ~
+      Extensions: html,htm
+      IgnoreFolders: obj,bin,node_modules
+      Recurse: true
 
     - Path: wwwroot
       Extensions: html,htm
@@ -36,7 +42,7 @@ UseAutoTheme: true
 # The Theme item or any of its option groups can be omitted.
 # * Options use SCSS values
 Theme:
-  
+    
     # Use adaptive layout breakpoints (mobi, tabp, etc.) to scale
     # font sizes and other layout elements using rem units instead
     # of using media breakpoints for this purpose.
@@ -87,17 +93,17 @@ Theme:
         
         # This option does not exist so it will be added 
         panel: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-        
+    
     FilterSize:
         
         # This option does not exist so it will be added 
         panel: 2rem
-        
+    
     BackdropGrayscale:
         
         # This option does not exist so it will be added 
         panel: 75%
-        
+    
     BackdropHueRotate:
         
         # This option does not exist so it will be added 
@@ -274,9 +280,9 @@ Theme:
         8xl: 100rem
 
     Container:
-      
-      # This option exists so it will be replaced 
-      "": "width: 100%;
+        
+        # This option exists so it will be replaced 
+        "": "width: 100%;
            margin-left: auto;
            margin-right: auto;
             
@@ -301,9 +307,9 @@ Theme:
            }"
 
     Elastic:
-
-      # This option exists so it will be replaced 
-      "": "width: 100%;
+        
+        # This option exists so it will be replaced 
+        "": "width: 100%;
            margin-left: auto;
            margin-right: auto;
            
@@ -403,9 +409,9 @@ Theme:
         banner: 60em
 
     Size:
-      
-      # This option does not exist so it will be added 
-      bannerSquare: 60rem
+        
+        # This option does not exist so it will be added 
+        bannerSquare: 60rem
 
     Width:
 
@@ -630,7 +636,7 @@ Theme:
         Lg: 16px
         Xl: 16px
         Xxl: 16px
-  
+        
         # When using adaptive layout, use the following adaptive breakpoint font size units
         # Zero: 16px
         # Mobi: 16px
