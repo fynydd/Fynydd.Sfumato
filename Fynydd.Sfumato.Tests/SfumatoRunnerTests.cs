@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Fynydd.Sfumato.Entities;
 using Fynydd.Sfumato.Extensions;
 
@@ -8,39 +7,39 @@ public class SfumatoRunnerTests
 {
     #region Constants
 
-    public static string Markup => """
-                                   <!DOCTYPE html>
-                                   <html lang="en">
-                                   <head>
-                                       <meta charset="UTF-8">
-                                       <title>Sample Website</title>
-                                       <meta name="viewport" content="width=device-width, initial-scale=1">
-                                       <link rel="stylesheet" href="css/sfumato.css">
-                                   </head>
-                                   <body class="text-base/5 xl:text-base/[3rem]">
-                                       <div id="test-home" class="text-[1rem] lg:text-[1.25rem] bg-fuchsia-500 dark:bg-fuchsia-300 dark:text-[length:1rem] xl:text-[#112233] xl:text-[red] xl:text-[color:--my-color-var] xl:text-[color:var(--my-color-var)]">
-                                           <p class="[font-weight:900] sm:[font-weight:900]">Placeholder</p>
-                                           <p class="[fontweight:400] sm:[fontweight:300] xl:text[#112233] xl:text-slate[#112233] xl:text-slate-50[#112233] xl:text-slate-50-[#112233]">Invalid Classes</p>
-                                       </div>
-                                       <div class="block invisible top-8 break-after-auto container aspect-screen xxl:aspect-[8/4]"></div>
-                                       <script>
-                                           function test() {
-                                             let el = document.getElementById('test-element');
-                                             if (el) {
-                                                   el.classList.add($`
-                                                       bg-emerald-900
-                                                       [font-weight:700]
-                                                       md:[font-weight:700]
-                                                   `);
-                                                   el.classList.add(`bg-emerald-950`);
-                                                   el.classList.add(`[font-weight:600]`);
-                                                   el.classList.add(`lg:[font-weight:600]`);
-                                             }
-                                           }
-                                       </script>
-                                   </body>
-                                   </html>
-                                   """;
+    private static string Markup => """
+                                    <!DOCTYPE html>
+                                    <html lang="en">
+                                    <head>
+                                        <meta charset="UTF-8">
+                                        <title>Sample Website</title>
+                                        <meta name="viewport" content="width=device-width, initial-scale=1">
+                                        <link rel="stylesheet" href="css/sfumato.css">
+                                    </head>
+                                    <body class="text-base/5 xl:text-base/[3rem]">
+                                        <div id="test-home" class="text-[1rem] lg:text-[1.25rem] bg-fuchsia-500 dark:bg-fuchsia-300 dark:text-[length:1rem] xl:text-[#112233] xl:text-[red] xl:text-[color:--my-color-var] xl:text-[color:var(--my-color-var)]">
+                                            <p class="[font-weight:900] sm:[font-weight:900]">Placeholder</p>
+                                            <p class="[fontweight:400] sm:[fontweight:300] xl:text[#112233] xl:text-slate[#112233] xl:text-slate-50[#112233] xl:text-slate-50-[#112233]">Invalid Classes</p>
+                                        </div>
+                                        <div class="block invisible top-8 break-after-auto container aspect-screen xxl:aspect-[8/4]"></div>
+                                        <script>
+                                            function test() {
+                                              let el = document.getElementById('test-element');
+                                              if (el) {
+                                                    el.classList.add($`
+                                                        bg-emerald-900
+                                                        [font-weight:700]
+                                                        md:[font-weight:700]
+                                                    `);
+                                                    el.classList.add(`bg-emerald-950`);
+                                                    el.classList.add(`[font-weight:600]`);
+                                                    el.classList.add(`lg:[font-weight:600]`);
+                                              }
+                                            }
+                                        </script>
+                                    </body>
+                                    </html>
+                                    """;
     
     #endregion
     
@@ -94,16 +93,16 @@ public class SfumatoRunnerTests
 
         await appState.InitializeAsync(Array.Empty<string>());
 
-        var regex = new Regex(@"(peer\-([a-z\-]{1,50}[/]{0,1}([a-z\-]{0,50})?:))", RegexOptions.Compiled);
+        var regex = appState.PeerVariantRegex;
         var matches = regex.Matches("md:peer-hover:text-base");
 
         Assert.Single(matches);
-        Assert.Equal("peer-hover:", matches[0].Value);
+        Assert.Equal("md:peer-hover:text-base", matches[0].Value);
 
         matches = regex.Matches("md:peer-hover/checkbox:text-base");
 
         Assert.Single(matches);
-        Assert.Equal("peer-hover/checkbox:", matches[0].Value);
+        Assert.Equal("md:peer-hover/checkbox:text-base", matches[0].Value);
 
         var cssSelector = new CssSelector(appState, "peer-hover/test:text-base");
         await cssSelector.ProcessSelectorAsync();
@@ -128,21 +127,33 @@ public class SfumatoRunnerTests
 
         await appState.InitializeAsync(Array.Empty<string>());
 
-        var regex = new Regex(@"(group\-([a-z\-]{1,50}[/]{0,1}([a-z\-]{0,50})?:))", RegexOptions.Compiled);
+        var regex = appState.GroupVariantRegex;
+        var ms = regex.Matches("group-hover/test:text-base");
+        Assert.Single(ms);
+        ms = regex.Matches("md:group-hover/test:text-base");
+        Assert.Single(ms);
+        ms = regex.Matches("md:group-[.selected]:text-base");
+        Assert.Single(ms);
+        
         var matches = regex.Matches("md:group-hover:text-base");
 
         Assert.Single(matches);
-        Assert.Equal("group-hover:", matches[0].Value);
+        Assert.Equal("md:group-hover:text-base", matches[0].Value);
 
         matches = regex.Matches("md:group-hover/checkbox:text-base");
 
         Assert.Single(matches);
-        Assert.Equal("group-hover/checkbox:", matches[0].Value);
+        Assert.Equal("md:group-hover/checkbox:text-base", matches[0].Value);
 
         var cssSelector = new CssSelector(appState, "group-hover/test:text-base");
         await cssSelector.ProcessSelectorAsync();
-
+        
         Assert.Equal(@"group\/test:hover .group-hover\/test\:text-base", cssSelector.EscapedSelector);
+
+        cssSelector = new CssSelector(appState, "group-hover/test:text-base/1");
+        await cssSelector.ProcessSelectorAsync();
+
+        Assert.Equal(@"group\/test:hover .group-hover\/test\:text-base\/1", cssSelector.EscapedSelector);
 
         var result = new ScssClass
         {
@@ -152,7 +163,64 @@ public class SfumatoRunnerTests
             CompactScssProperties = cssSelector.ScssMarkup.CompactCss()
         };
 
-        Assert.Equal($$""".group\/test:hover .group-hover\/test\:text-base { font-size: {{appState.TextSizeOptions["base"]}}; line-height: {{appState.TextSizeLeadingOptions["base"]}}; }""".CompactCss(), result.GetScssMarkup().CompactCss());
+        Assert.Equal($$""".group\/test:hover .group-hover\/test\:text-base\/1 { font-size: {{appState.TextSizeOptions["base"]}}; line-height: 1; }""".CompactCss(), result.GetScssMarkup().CompactCss());
+        
+        cssSelector = new CssSelector(appState, "group:text-base");
+        await cssSelector.ProcessSelectorAsync();
+
+        Assert.Equal(@"group\:text-base", cssSelector.EscapedSelector);
+        
+        cssSelector = new CssSelector(appState, "group-[.selected]:text-base");
+        await cssSelector.ProcessSelectorAsync();
+
+        Assert.Equal(@"group.selected .group-\[\.selected\]\:text-base", cssSelector.EscapedSelector);
+
+        result = new ScssClass
+        {
+            Selectors = { cssSelector.EscapedSelector },
+            PseudoclassSuffix = cssSelector.PseudoclassPath,
+            ScssProperties = cssSelector.GetStyles(),
+            CompactScssProperties = cssSelector.ScssMarkup.CompactCss()
+        };
+
+        Assert.Equal($$""".group.selected .group-\[\.selected\]\:text-base { font-size: {{appState.TextSizeOptions["base"]}}; line-height: {{appState.TextSizeLeadingOptions["base"]}}; }""".CompactCss(), result.GetScssMarkup().CompactCss());
+        
+        cssSelector = new CssSelector(appState, "group-[.selected]:text-base/1");
+        await cssSelector.ProcessSelectorAsync();
+
+        Assert.Equal(@"group.selected .group-\[\.selected\]\:text-base\/1", cssSelector.EscapedSelector);
+
+        result = new ScssClass
+        {
+            Selectors = { cssSelector.EscapedSelector },
+            PseudoclassSuffix = cssSelector.PseudoclassPath,
+            ScssProperties = cssSelector.GetStyles(),
+            CompactScssProperties = cssSelector.ScssMarkup.CompactCss()
+        };
+
+        Assert.Equal($$""".group.selected .group-\[\.selected\]\:text-base\/1 { font-size: {{appState.TextSizeOptions["base"]}}; line-height: {{appState.LeadingOptions["1"]}}; }""".CompactCss(), result.GetScssMarkup().CompactCss());
+        
+        cssSelector = new CssSelector(appState, "tabp:group-[.selected]:text-base/1");
+        await cssSelector.ProcessSelectorAsync();
+
+        Assert.Equal(@"group.selected .tabp\:group-\[\.selected\]\:text-base\/1", cssSelector.EscapedSelector);
+        
+        result = new ScssClass
+        {
+            Selectors = { cssSelector.EscapedSelector },
+            PseudoclassSuffix = cssSelector.PseudoclassPath,
+            ScssProperties = cssSelector.GetStyles(),
+            CompactScssProperties = cssSelector.ScssMarkup.CompactCss()
+        };
+
+        Assert.Equal($$""".group.selected .tabp\:group-\[\.selected\]\:text-base\/1 { font-size: {{appState.TextSizeOptions["base"]}}; line-height: 1; }""".CompactCss(), result.GetScssMarkup().CompactCss());
+
+        matches = appState.CoreClassRegex.Matches("""<div class="group-hover/edit:text-base/1 group-hover:text-base/1 tabp:group-[.selected]:text-base/1">Test!</div>""");
+        
+        Assert.Equal(3, matches.Count);
+        Assert.Equal("group-hover/edit:text-base/1", matches[0].Value);
+        Assert.Equal("group-hover:text-base/1", matches[1].Value);
+        Assert.Equal("tabp:group-[.selected]:text-base/1", matches[2].Value);
     }
 
     [Fact]

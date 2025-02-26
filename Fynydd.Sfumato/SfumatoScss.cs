@@ -88,7 +88,7 @@ public static class SfumatoScss
     /// </summary>
     /// <param name="appState"></param>
     /// <param name="sb"></param>
-    public static void ProcessShortCodes(SfumatoAppState appState, StringBuilder sb)
+    private static void ProcessShortCodes(SfumatoAppState appState, StringBuilder sb)
     {
         var breakpoints = appState.StringBuilderPool.Get();
         
@@ -102,7 +102,7 @@ public static class SfumatoScss
             sb.Replace("#{xl-bp}", $"{appState.Settings.Theme.MediaBreakpoint?.Xl}");
             sb.Replace("#{xxl-bp}", $"{appState.Settings.Theme.MediaBreakpoint?.Xxl}");
             
-            sb.Replace("$internal-dark-theme: \"\";", $"$internal-dark-theme: \"{(appState.Settings.DarkMode.Equals("media", StringComparison.OrdinalIgnoreCase) ? "media" : appState.Settings.UseAutoTheme ? "class+auto" : "class")}\";");
+            sb.Replace("$internal-dark-theme: \"\";", $"$internal-dark-theme: \"{(appState.Settings.DarkMode.Equals("media", StringComparison.Ordinal) ? "media" : appState.Settings.UseAutoTheme ? "class+auto" : "class")}\";");
 
             sb.Replace("$mobi-breakpoint: \"\";", $"$mobi-breakpoint: \"{appState.MediaQueryPrefixes.First(p => p.Prefix == "mobi").Statement.TrimStart("@media ").TrimEnd("{")?.Trim()}\";");
             sb.Replace("$phab-breakpoint: \"\";", $"$phab-breakpoint: \"{appState.MediaQueryPrefixes.First(p => p.Prefix == "phab").Statement.TrimStart("@media ").TrimEnd("{")?.Trim()}\";");
@@ -130,15 +130,7 @@ public static class SfumatoScss
                         
                         if (prefix.Prefix == "xxl")
                         {
-                            if (fontSize.EndsWith("vw", StringComparison.Ordinal))
-                            {
-                                fontSize = $"calc(#{{$xxl-breakpoint}} * (#{{sf-strip-unit({appState.Settings.Theme.FontSizeUnit?.Xxl})}} / 100))";
-                            }
-            
-                            else
-                            {
-                                fontSize = $"{appState.Settings.Theme.FontSizeUnit?.Xxl}";
-                            }
+	                        fontSize = fontSize.EndsWith("vw", StringComparison.Ordinal) ? $"calc(#{{$xxl-breakpoint}} * (#{{sf-strip-unit({appState.Settings.Theme.FontSizeUnit?.Xxl})}} / 100))" : $"{appState.Settings.Theme.FontSizeUnit?.Xxl}";
                         }
                         
                         breakpoints.Append($"{prefix.Statement}\n");
@@ -242,11 +234,10 @@ public static class SfumatoScss
 				arguments.Add("--no-source-map");
 			}
 
-			if (filePath.Contains(Path.DirectorySeparatorChar))
-				arguments.Add($"--load-path={filePath[..filePath.LastIndexOf(Path.DirectorySeparatorChar)]}");
-			else
-				arguments.Add($"--load-path={runner.AppState.WorkingPath}");
-			
+			arguments.Add(filePath.Contains(Path.DirectorySeparatorChar)
+				? $"--load-path={filePath[..filePath.LastIndexOf(Path.DirectorySeparatorChar)]}"
+				: $"--load-path={runner.AppState.WorkingPath}");
+
 			arguments.Add("--stdin");
 			arguments.Add(cssOutputPath);
 			
@@ -530,9 +521,9 @@ public static class SfumatoScss
 
 public class CssMediaQuery
 {
-	public int PrefixOrder { get; set; }
-	public int Priority { get; set; }
-	public string Prefix { get; set; } = string.Empty;
-	public string PrefixType { get; set; } = string.Empty;
-	public string Statement { get; set; } = string.Empty;
+	public int PrefixOrder { get; init; }
+	public int Priority { get; init; }
+	public string Prefix { get; init; } = string.Empty;
+	public string PrefixType { get; init; } = string.Empty;
+	public string Statement { get; init; } = string.Empty;
 }
