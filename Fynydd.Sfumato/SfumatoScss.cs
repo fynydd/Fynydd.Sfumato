@@ -467,6 +467,53 @@ public static class SfumatoScss
 
             #endregion
             
+            #region Process single value directives
+
+            matches = runner.AppState.SfumatoScssValueRegex.Matches(sb.ToString());
+            startIndex = 0;
+            
+            while (matches.Count > 0)
+            {
+	            var match = matches[0];
+				
+	            if (match.Index + match.Value.Length > startIndex)
+		            startIndex = match.Index + match.Value.Length;
+
+	            var selector = match.Value.TrimStart("var(").TrimEnd(")")?.Trim() ?? string.Empty;
+
+	            if (runner.AppState.IsValidCoreClassSelector(selector))
+	            {
+		            styles.Clear();
+		            first.Clear();
+		            second.Clear();
+                    
+		            var newCssSelector = new CssSelector(runner.AppState, selector);
+
+		            await newCssSelector.ProcessSelectorAsync();
+
+		            sb.Remove(match.Index, match.Value.Length);
+
+		            if (newCssSelector.IsInvalid == false)
+		            {
+			            var value = newCssSelector.GetStyles().Trim();
+
+			            if (value.Contains('\r') == false && value.Contains('\n') == false && value.IndexOf(':') > 0 && value.IndexOf(':') < value.Length - 1)
+			            {
+				            value = value[(value.IndexOf(':') + 1)..].Trim();
+				            sb.Insert(match.Index, value.TrimEnd(';').CompactCss());
+			            }
+		            }
+	            }
+	            else
+	            {
+		            sb.Remove(match.Index, match.Value.Length);
+	            }
+				
+	            matches = runner.AppState.SfumatoScssValueRegex.Matches(sb.ToString());
+            }
+
+            #endregion
+            
             await File.WriteAllTextAsync(cssOutputPath, sb.ToString());
 
 			if (showOutput == false)
