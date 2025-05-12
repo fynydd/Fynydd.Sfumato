@@ -1,1 +1,9 @@
+global using System;
+global using System.Text;
+global using System.Collections;
 global using Xunit;
+global using Xunit.Abstractions;
+global using Fynydd.Sfumato.Entities.CssClassProcessing;
+global using Fynydd.Sfumato.Entities.Runners;
+global using Fynydd.Sfumato.Entities.Scanning;
+global using Fynydd.Sfumato.Helpers;
