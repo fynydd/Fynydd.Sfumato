@@ -9,14 +9,11 @@ global using System.Text;
 global using System.Text.RegularExpressions;
 global using System.Threading;
 global using System.Threading.Tasks;
-global using Microsoft.Extensions.ObjectPool;
 
-global using Fynydd.Sfumato.Entities.CssClassProcessing;
-global using Fynydd.Sfumato.Entities.Library;
-global using Fynydd.Sfumato.Entities.Messenger;
-global using Fynydd.Sfumato.Entities.Runners;
-global using Fynydd.Sfumato.Entities.Scanning;
-global using Fynydd.Sfumato.Entities.Trie;
-global using Fynydd.Sfumato.Entities.UtilityClasses;
-global using Fynydd.Sfumato.Helpers;
-global using Fynydd.Sfumato.Validators;
+global using Fynydd.Sfumato.Entities;
+global using Fynydd.Sfumato.Entities.SfumatoSettings;
+global using Fynydd.Sfumato.Entities.ScssUtilityCollections;
+global using Fynydd.Sfumato.Extensions;
+
+global using CliWrap;
+global using Microsoft.Extensions.ObjectPool;

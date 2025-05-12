@@ -1,12 +1,22 @@
-# Sfumato: The Ultra-Fast CSS Generation Tool
+# SFUMATO
 
-Sfumato is a lean, modern, utility-based CSS framework with relative UI scaling and adaptive design built-in. Add few lines to your CSS file and Sfumato will watch your project as you work, keeping track of changes, and generate a custom, tiny CSS file based only on the utility classes you use. And Sfumato uses the same class naming convention as Tailwind CSS v4!
+Sfumato is a lean, modern, utility-based CSS framework generation tool. It is compatible with the Tailwind CSS class naming structure and has the following additional features:
 
 - The Sfumato CLI tool is written in cross-platform (multi-threaded) native code, not javascript, and is much faster than Tailwind
+- Dart Sass (also cross-platform native code) is embedded so you get all the benefits of using Sass as part of your workflow
 - Sfumato provides an optional scalable CSS system that makes all the viewport sizes between breakpoints scale like a PDF for a more controlled layout
-- Dark theme mode that supports system theme matching, as well as classes that include an "auto" class to fall back to system matching
+- Theme mode that supports system theme matching, as well as classes that include an "auto" class to fall back to system matching
 - Integrated form element styles (class compatible with Tailwind forms plugin)
+- Supports redirected input for use in automation workflows
 - One install works for all your projects!
+
+## How To Use
+
+Create one simple "sfumato.yml" file (manually or using the Sfumato "init" command) for your web-based app or website project and run the Sfumato CLI "watch" command. It will watch your project files as you work, keeping track of your markup changes, and will transpile your SCSS files into custom, tiny CSS files based only on the Sfumato features you use.
+
+Use the following command for more information on Sfumato commands and options:
+
+```sfumato help```
 
 ## Installation
 
@@ -23,12 +33,6 @@ Run the following command in your command line interface (e.g. cmd, PowerShell, 
 Later you can update Sfumato with the following command:
 
 ```dotnet tool update --global fynydd.sfumato```
-
-## How To Use
-
-Use the following command for more information on editing your CSS file and using Sfumato commands and options:
-
-```sfumato help```
 
 ## Uninstall
 
