@@ -276,7 +276,15 @@ public static class AppRunnerExtensions
 				foreach (var span in value.EnumerateCssCustomProperties(namesOnly: true))
 				{
 					if (appRunner.AppRunnerSettings.SfumatoBlockItems.TryGetValue(span.Property.ToString(), out var valueValue))
+					{
 						appRunner.UsedCssCustomProperties.TryAdd(span.Property.ToString(), valueValue);
+						
+						foreach (var span2 in valueValue.EnumerateCssCustomProperties(namesOnly: true))
+						{
+							if (appRunner.AppRunnerSettings.SfumatoBlockItems.TryGetValue(span2.Property.ToString(), out var valueValue2))
+								appRunner.UsedCssCustomProperties.TryAdd(span2.Property.ToString(), valueValue2);
+						}
+					}
 				}
 			}
 
@@ -324,7 +332,7 @@ public static class AppRunnerExtensions
 
 				for (var i = 0; i < wrappers.Length; i++)
 				{
-					var items = appRunner.UsedCssCustomProperties.Where(c => (c.Key == "--spacing" || (c.Key.StartsWith("--sf-") == (i != 0))) && string.IsNullOrEmpty(c.Value) == false).ToList();
+					var items = appRunner.UsedCssCustomProperties.Where(c => (c.Key == "--spacing" || (c.Key.StartsWith("--sf-") == (i != 0)) || (c.Key.StartsWith("--form-") == (i != 0))) && string.IsNullOrEmpty(c.Value) == false).ToList();
 					
 					if (items.Count == 0)
 						continue;

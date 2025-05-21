@@ -1,6 +1,6 @@
 // ReSharper disable RawStringCanBeSimplified
 
-namespace Fynydd.Sfumato.Entities.UtilityClasses.TransitionsAnimations;
+namespace Fynydd.Sfumato.Entities.UtilityClasses.TransitionsAndAnimations;
 
 public sealed class TransitionDuration : ClassDictionaryBase
 {
