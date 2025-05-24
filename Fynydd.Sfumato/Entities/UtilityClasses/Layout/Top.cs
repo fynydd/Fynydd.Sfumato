@@ -6,6 +6,8 @@ public sealed class Top : ClassDictionaryBase
 {
     public Top()
     {
+        Group = "top";
+        Description = "Utilities for setting the top offset of positioned elements.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             #region Statics

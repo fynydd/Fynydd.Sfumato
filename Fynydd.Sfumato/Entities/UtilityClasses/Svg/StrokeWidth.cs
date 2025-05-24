@@ -6,6 +6,8 @@ public sealed class StrokeWidth : ClassDictionaryBase
 {
     public StrokeWidth()
     {
+        Group = "stroke";
+        Description = "Utilities for setting SVG stroke width.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

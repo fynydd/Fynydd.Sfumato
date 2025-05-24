@@ -6,6 +6,8 @@ public sealed class PointerEvents : ClassDictionaryBase
 {
     public PointerEvents()
     {
+        Group = "pointer-events";
+        Description = "Utilities for enabling or disabling pointer events.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

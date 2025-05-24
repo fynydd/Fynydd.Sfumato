@@ -6,6 +6,8 @@ public sealed class BackdropHueRotate : ClassDictionaryBase
 {
     public BackdropHueRotate()
     {
+        Group = "backdrop-filter/hue-rotate";
+        Description = "Utilities for rotating background hue.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

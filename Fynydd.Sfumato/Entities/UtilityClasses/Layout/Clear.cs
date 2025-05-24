@@ -6,6 +6,8 @@ public sealed class Clear : ClassDictionaryBase
 {
     public Clear()
     {
+        Group = "clear";
+        Description = "Utilities for controlling the clearing of floated elements.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

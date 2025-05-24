@@ -6,6 +6,8 @@ public sealed class Perspective : ClassDictionaryBase
 {
     public Perspective()
     {
+        Group = "perspective";
+        Description = "Utilities for applying perspective transforms.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

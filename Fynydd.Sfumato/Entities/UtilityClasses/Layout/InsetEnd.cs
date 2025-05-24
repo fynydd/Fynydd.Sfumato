@@ -6,6 +6,8 @@ public sealed class InsetEnd : ClassDictionaryBase
 {
     public InsetEnd()
     {
+        Group = "inset";
+        Description = "Utilities for setting the logical end edge inset.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             #region Statics

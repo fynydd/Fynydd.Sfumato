@@ -6,6 +6,8 @@ public sealed class ScrollSnapType : ClassDictionaryBase
 {
     public ScrollSnapType()
     {
+        Group = "scroll-snap-type";
+        Description = "Utilities for configuring scroll snap type.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

@@ -167,11 +167,13 @@ public sealed class Library
     private sealed class ExportItem
     {
         public string Category { get; set; } = string.Empty;
+        public string Group { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
         public Dictionary<string,ClassDefinition> Usages { get; } = [];
     }
     
-    public string ExportDefinitions()
+    public string ExportUtilityClassDefinitions(AppRunner appRunner)
     {
         var exportItems = new List<ExportItem>();
         var derivedTypes = Assembly.GetExecutingAssembly()
@@ -183,6 +185,24 @@ public sealed class Library
             if (Activator.CreateInstance(type) is not ClassDictionaryBase instance)
                 continue;
 
+            SimpleClasses.Clear();
+            AbstractClasses.Clear();
+            AngleHueClasses.Clear();
+            ColorClasses.Clear();
+            DurationClasses.Clear();
+            FlexClasses.Clear();
+            FloatNumberClasses.Clear();
+            FrequencyClasses.Clear();
+            IntegerClasses.Clear();
+            LengthClasses.Clear();
+            PercentageClasses.Clear();
+            RatioClasses.Clear();
+            ResolutionClasses.Clear();
+            StringClasses.Clear();
+            UrlClasses.Clear();
+            
+            instance.ProcessThemeSettings(appRunner);
+            
             var segments = type.FullName?.Split('.') ?? [];
 
             if (segments.Length < 2)
@@ -191,16 +211,77 @@ public sealed class Library
             var exportItem = new ExportItem
             {
                 Category = segments[^2].PascalCaseToSpaced(),
-                Name = segments[^1].PascalCaseToSpaced()
+                Group = instance.Group ?? string.Empty,
+                Description = instance.Description ?? string.Empty,
+                Name = segments[^1].PascalCaseToSpaced(),
             };
             
             foreach (var item in instance.Data)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in SimpleClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+            
+            foreach (var item in AbstractClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in AngleHueClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in ColorClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in DurationClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in FlexClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in FloatNumberClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in FrequencyClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in IntegerClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in LengthClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in PercentageClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in RatioClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in ResolutionClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in StringClasses)
+                exportItem.Usages.Add(item.Key, item.Value);
+
+            foreach (var item in UrlClasses)
                 exportItem.Usages.Add(item.Key, item.Value);
             
             exportItems.Add(exportItem);
         }
 
         var json = JsonSerializer.Serialize(exportItems, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+            IncludeFields = true,
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        });
+
+        return json;
+    }
+
+    public string ExportColorDefinitions(AppRunner appRunner)
+    {
+        var json = JsonSerializer.Serialize(appRunner.Library.ColorsByName.ToList(), new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,

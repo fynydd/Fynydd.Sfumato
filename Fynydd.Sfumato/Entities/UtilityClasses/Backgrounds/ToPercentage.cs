@@ -6,6 +6,8 @@ public sealed class ToPercentage : ClassDictionaryBase
 {
     public ToPercentage()
     {
+        Group = "background-image";
+        Description = "Utilities for configuring background gradient to percentage.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

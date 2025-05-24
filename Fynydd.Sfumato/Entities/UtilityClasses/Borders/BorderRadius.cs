@@ -5,6 +5,12 @@ namespace Fynydd.Sfumato.Entities.UtilityClasses.Borders;
 // ReSharper disable once ClassNeverInstantiated.Global
 public sealed class BorderRadius : ClassDictionaryBase
 {
+    public BorderRadius()
+    {
+        Group = "border-radius";
+        Description = "Utilities for setting border radius for rounded corners.";
+    }
+
     public static readonly Dictionary<string, string> Borders = new ()
     {
         {

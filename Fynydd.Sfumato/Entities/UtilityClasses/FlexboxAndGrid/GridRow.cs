@@ -6,6 +6,8 @@ public sealed class GridRow : ClassDictionaryBase
 {
     public GridRow()
     {
+        Group = "grid-row";
+        Description = "Utilities for placing grid items within rows.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             #region row-span

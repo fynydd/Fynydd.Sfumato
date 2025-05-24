@@ -6,6 +6,8 @@ public sealed class FontSize : ClassDictionaryBase
 {
     public FontSize()
     {
+        Group = "font-size";
+        Description = "Utilities for setting font size.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {
@@ -31,7 +33,7 @@ public sealed class FontSize : ClassDictionaryBase
     
     public override void ProcessThemeSettings(AppRunner appRunner)
     {
-        foreach (var text in appRunner.AppRunnerSettings.SfumatoBlockItems.Where(i => i.Key.StartsWith("--text-") && i.Key.LastIndexOf("--", StringComparison.Ordinal) == 0))
+        foreach (var text in appRunner.AppRunnerSettings.SfumatoBlockItems.Where(i => i.Key.StartsWith("--text-") && i.Key.StartsWith("--text-shadow-") == false && i.Key.LastIndexOf("--", StringComparison.Ordinal) == 0))
         {
             var key = text.Key.Trim('-');
             var value = new ClassDefinition

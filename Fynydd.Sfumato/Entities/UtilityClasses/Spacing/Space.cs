@@ -6,6 +6,8 @@ public sealed class Space : ClassDictionaryBase
 {
     public Space()
     {
+        Group = "margin";
+        Description = "Utilities for controlling spacing between children elements.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             #region space-x

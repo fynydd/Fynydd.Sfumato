@@ -6,6 +6,8 @@ public sealed class OverflowWrap : ClassDictionaryBase
 {
     public OverflowWrap()
     {
+        Group = "overflow-wrap";
+        Description = "Utilities for handling overflow wrapping of text.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

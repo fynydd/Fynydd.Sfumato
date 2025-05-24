@@ -6,6 +6,8 @@ public sealed class InsetY : ClassDictionaryBase
 {
     public InsetY()
     {
+        Group = "inset";
+        Description = "Utilities for setting vertical insets.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             #region Statics

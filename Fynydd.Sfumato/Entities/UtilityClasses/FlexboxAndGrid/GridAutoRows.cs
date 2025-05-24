@@ -6,6 +6,8 @@ public sealed class GridAutoRows : ClassDictionaryBase
 {
     public GridAutoRows()
     {
+        Group = "grid-auto-rows";
+        Description = "Utilities for specifying the size of automatically created grid rows.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

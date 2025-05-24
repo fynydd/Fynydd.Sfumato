@@ -6,6 +6,8 @@ public sealed class BoxSizing : ClassDictionaryBase
 {
     public BoxSizing()
     {
+        Group = "box-sizing";
+        Description = "Utilities for setting box-sizing model.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

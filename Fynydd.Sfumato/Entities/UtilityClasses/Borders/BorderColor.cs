@@ -5,6 +5,12 @@ namespace Fynydd.Sfumato.Entities.UtilityClasses.Borders;
 // ReSharper disable once ClassNeverInstantiated.Global
 public sealed class BorderColor : ClassDictionaryBase
 {
+    public BorderColor()
+    {
+        Group = "border-color";
+        Description = "Utilities for setting border color.";
+    }
+
     public static readonly Dictionary<string, string> BorderColors = new ()
     {
         {

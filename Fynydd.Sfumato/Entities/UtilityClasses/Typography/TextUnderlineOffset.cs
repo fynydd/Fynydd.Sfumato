@@ -6,6 +6,8 @@ public sealed class TextUnderlineOffset : ClassDictionaryBase
 {
     public TextUnderlineOffset()
     {
+        Group = "text-underline-offset";
+        Description = "Utilities for controlling the offset of underlines.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

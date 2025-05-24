@@ -6,6 +6,8 @@ public sealed class BreakBefore : ClassDictionaryBase
 {
     public BreakBefore()
     {
+        Group = "break before";
+        Description = "Utilities for configuring break before.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

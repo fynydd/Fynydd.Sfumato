@@ -6,6 +6,8 @@ public sealed class Saturate : ClassDictionaryBase
 {
     public Saturate()
     {
+        Group = "filter/saturate";
+        Description = "Utilities for controlling color saturation.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             {

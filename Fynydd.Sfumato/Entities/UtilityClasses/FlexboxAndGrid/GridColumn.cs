@@ -6,6 +6,8 @@ public sealed class GridColumn : ClassDictionaryBase
 {
     public GridColumn()
     {
+        Group = "grid-column";
+        Description = "Utilities for placing grid items within columns.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
             #region col-span
