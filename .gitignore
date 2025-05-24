@@ -52,3 +52,5 @@ msbuild.wrn
 /Fynydd.Sfumato.Tests/SampleWebsite/wwwroot/index.html.css
 
 fynydd-attribution.sh
+/Fynydd.Sfumato.Tests/colors.json
+/Fynydd.Sfumato.Tests/utility-classes.json
