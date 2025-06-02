@@ -162,25 +162,34 @@ public sealed class Library
         }        
     }
 
-    // ReSharper disable UnusedAutoPropertyAccessor.Local
-    // ReSharper disable CollectionNeverQueried.Local
-    private sealed class ExportItem
-    {
-        public string Category { get; set; } = string.Empty;
-        public string Group { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public Dictionary<string,ClassDefinition> Usages { get; } = [];
-    }
-    
     public string ExportUtilityClassDefinitions(AppRunner appRunner)
     {
         var exportItems = new List<ExportItem>();
         var derivedTypes = Assembly.GetExecutingAssembly()
             .GetTypes()
-            .Where(t => typeof(ClassDictionaryBase).IsAssignableFrom(t) && t is { IsClass: true, IsAbstract: false });
+            .Where(t => typeof(ClassDictionaryBase).IsAssignableFrom(t) && t is { IsClass: true, IsAbstract: false })
+            .OrderBy(t => t.AssemblyQualifiedName)
+            .ToList();
+        var groups = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var type in derivedTypes.OrderBy(t => t.AssemblyQualifiedName))
+        foreach (var type in derivedTypes)
+        {
+            if (Activator.CreateInstance(type) is not ClassDictionaryBase instance)
+                continue;
+
+            if (string.IsNullOrEmpty(instance.GroupDescription) == false)
+                groups.TryAdd(instance.Group, instance.GroupDescription);
+        }
+
+        foreach (var type in derivedTypes)
+        {
+            if (Activator.CreateInstance(type) is not ClassDictionaryBase instance)
+                continue;
+
+            groups.TryAdd(instance.Group, instance.Description);
+        }
+
+        foreach (var type in derivedTypes)
         {
             if (Activator.CreateInstance(type) is not ClassDictionaryBase instance)
                 continue;
@@ -212,8 +221,9 @@ public sealed class Library
             {
                 Category = segments[^2].PascalCaseToSpaced(),
                 Group = instance.Group ?? string.Empty,
-                Description = instance.Description ?? string.Empty,
+                GroupDescription = groups[instance.Group ?? string.Empty],
                 Name = segments[^1].PascalCaseToSpaced(),
+                Description = instance.Description ?? string.Empty,
             };
             
             foreach (var item in instance.Data)
@@ -267,29 +277,24 @@ public sealed class Library
             exportItems.Add(exportItem);
         }
 
-        var json = JsonSerializer.Serialize(exportItems, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-            IncludeFields = true,
-            WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        });
+        var json = JsonSerializer.Serialize(exportItems, Jso);
 
         return json;
     }
 
     public string ExportColorDefinitions(AppRunner appRunner)
     {
-        var json = JsonSerializer.Serialize(appRunner.Library.ColorsByName.ToList(), new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-            IncludeFields = true,
-            WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        });
+        var json = JsonSerializer.Serialize(appRunner.Library.ColorsByName, Jso);
 
         return json;
     }
+
+    private JsonSerializerOptions Jso { get; } = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+        IncludeFields = true,
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 }

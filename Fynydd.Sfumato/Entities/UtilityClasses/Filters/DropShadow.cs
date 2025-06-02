@@ -7,6 +7,7 @@ public sealed class DropShadow : ClassDictionaryBase
     public DropShadow()
     {
         Group = "filter/drop-shadow";
+        GroupDescription = "Utilities for adding drop shadow effects to elements.";
         Description = "Utilities for adding drop shadow effects to elements.";
         Data.AddRange(new Dictionary<string, ClassDefinition>(StringComparer.Ordinal)
         {
@@ -56,14 +57,14 @@ public sealed class DropShadow : ClassDictionaryBase
                     $$"""
                       --sf-drop-shadow-alpha: {{pct}};
                       --sf-drop-shadow-color: {{color}};
-                      --sf-drop-shadow: {{newValue}};
+                      --sf-drop-shadow: drop-shadow({{newValue}});
                       filter: var(--sf-blur, ) var(--sf-brightness, ) var(--sf-contrast, ) var(--sf-grayscale, ) var(--sf-hue-rotate, ) var(--sf-invert, ) var(--sf-saturate, ) var(--sf-sepia, ) var(--sf-drop-shadow, );
                       """,
                 ModifierTemplate = 
                     $$"""
                       --sf-drop-shadow-alpha: {1}%;
                       --sf-drop-shadow-color: {{color}};
-                      --sf-drop-shadow: {{newValue}};
+                      --sf-drop-shadow: drop-shadow({{newValue}});
                       filter: var(--sf-blur, ) var(--sf-brightness, ) var(--sf-contrast, ) var(--sf-grayscale, ) var(--sf-hue-rotate, ) var(--sf-invert, ) var(--sf-saturate, ) var(--sf-sepia, ) var(--sf-drop-shadow, );
                       """,
             };
