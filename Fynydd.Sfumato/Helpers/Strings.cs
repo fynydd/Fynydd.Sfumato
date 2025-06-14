@@ -837,7 +837,7 @@ public static partial class Strings
 
 	/// <summary>
 	/// Get the left characters of a string up to but not including the first instance of "marker".
-	/// If the marker is not found, the original value is returned.
+	/// If marker is not found the original value is returned.
 	/// </summary>
 	/// <param name="value">String value</param>
 	/// <param name="marker">Delimiter to denote the cut off point</param>
