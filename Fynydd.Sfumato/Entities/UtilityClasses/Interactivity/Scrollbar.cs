@@ -18,19 +18,20 @@ public sealed class Scrollbar : ClassDictionaryBase
                         """
                         --sf-scrollbar-track-color: rgba(0, 0, 0, 0);
                         --sf-scrollbar-thumb-color: rgba(0, 0, 0, 0);
-                        
+
                         --sf-scrollbar-track-hover-color: rgba(0, 0, 0, 0);
                         --sf-scrollbar-thumb-hover-color: rgba(0, 0, 0, 0.25);
-                        
+
                         --sf-scrollbar-track-hover-dark-color: rgba(0, 0, 0, 0);
                         --sf-scrollbar-thumb-hover-dark-color: rgba(255, 255, 255, 0.35);
-                        
+
                         --sf-scrollbar-size: 0.5rem;
 
                         display: block;
                         width: 100%;
                         overflow-x: scroll;
                         overflow-y: hidden;
+                        -webkit-overflow-scrolling: touch;
 
                         scrollbar-gutter: stable;
 
@@ -134,6 +135,7 @@ public sealed class Scrollbar : ClassDictionaryBase
                         height: 100%;
                         overflow-x: hidden;
                         overflow-y: scroll;
+                        -webkit-overflow-scrolling: touch;
                         
                         scrollbar-gutter: stable;
                         
