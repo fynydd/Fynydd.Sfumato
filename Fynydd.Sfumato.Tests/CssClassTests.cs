@@ -412,7 +412,7 @@ public class CssClassTests(ITestOutputHelper testOutputHelper)
         Assert.Equal(@":is(.\*\*\:whitespace-pre\! *)", cssClass.EscapedSelector);
         Assert.Equal("white-space: pre !important;", cssClass.Styles);
     }
-    
+
     [Fact]
     public void DataAttributeHandling()
     {
@@ -438,7 +438,25 @@ public class CssClassTests(ITestOutputHelper testOutputHelper)
     public void ArbitraryCss()
     {
         var appRunner = new AppRunner(new AppState());
-        var cssClass = new CssClass(appRunner, "[--my-value:1rem]");
+        var cssClass = new CssClass(appRunner, "w-[calc(100vw-(--nav-width))]");
+
+        Assert.NotNull(cssClass);
+        Assert.True(cssClass.IsValid);
+        Assert.Equal("width: calc(100vw-var(--nav-width));", cssClass.Styles);
+
+        cssClass = new CssClass(appRunner, "w-[calc(100vw-var(--nav-width))]");
+
+        Assert.NotNull(cssClass);
+        Assert.True(cssClass.IsValid);
+        Assert.Equal("width: calc(100vw-var(--nav-width));", cssClass.Styles);
+
+        cssClass = new CssClass(appRunner, "w-[calc(100vw_-_var(--nav-width))]");
+
+        Assert.NotNull(cssClass);
+        Assert.True(cssClass.IsValid);
+        Assert.Equal("width: calc(100vw - var(--nav-width));", cssClass.Styles);
+
+        cssClass = new CssClass(appRunner, "[--my-value:1rem]");
 
         Assert.NotNull(cssClass);
         Assert.True(cssClass.IsValid);
