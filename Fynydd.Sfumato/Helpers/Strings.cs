@@ -173,6 +173,30 @@ public static partial class Strings
 	#region Trimming
 	
 	/// <summary>
+	/// Trim the first occurrence of a character from a string.
+	/// </summary>
+	/// <param name="str"></param>
+	/// <param name="value"></param>
+	public static string TrimFirst(this string str, char value)
+	{
+		var index = str.IndexOf(value);
+		
+		return index < 0 ? str : str.Remove(index, 1);
+	}
+
+	/// <summary>
+	/// Trim the last occurrence of a character from a string.
+	/// </summary>
+	/// <param name="str"></param>
+	/// <param name="value"></param>
+	public static string TrimLast(this string str, char value)
+	{
+		var index = str.LastIndexOf(value);
+		
+		return index < 0 ? str : str.Remove(index, 1);
+	}
+
+	/// <summary>
 	/// Trim the common prefix of from sourceString from targetString.
 	/// </summary>
 	/// <param name="targetString"></param>
@@ -463,6 +487,45 @@ public static partial class Strings
 	#endregion
 	
 	#region Parsing
+
+	/// <summary>
+	/// Extract a block of CSS by its starting declaration (e.g. "@layer components").
+	/// </summary>
+	/// <param name="sourceCss"></param>
+	/// <param name="cssBlockStart"></param>
+	/// <returns></returns>
+	public static string ExtractCssBlock(this string sourceCss, string cssBlockStart)
+	{
+		var blockStart = sourceCss.IndexOf(cssBlockStart, StringComparison.OrdinalIgnoreCase);
+
+		if (blockStart < 0)
+			return string.Empty;
+
+		var openBraceIndex = sourceCss.IndexOf('{', blockStart);
+        
+		if (openBraceIndex <= blockStart)
+			return string.Empty;
+
+		var braceCount = 0;
+		var closingBraceIndex = -1;
+
+		for (var i = openBraceIndex; i < sourceCss.Length; i++)
+		{
+			if (closingBraceIndex > -1)
+				break;
+			
+			// ReSharper disable once ConvertIfStatementToSwitchStatement
+			if (sourceCss[i] == '{')
+				braceCount++;
+			else if (sourceCss[i] == '}')
+				braceCount--;
+
+			if (braceCount == 0)
+				closingBraceIndex = i;
+		}
+
+		return closingBraceIndex < 0 ? string.Empty : sourceCss.Substring(blockStart, closingBraceIndex - blockStart + 1);
+	}
 
 	/// <summary>
 	/// Finds all blocks like “@media (prefers-color-scheme: dark) { … }” blocks in this StringBuilder,

@@ -99,47 +99,20 @@ public sealed class AppRunnerSettings(AppRunner? appRunner)
 
 	        #region Extract Sfumato settings block
 
-		    var sfumatoBlockStart = CssContent.IndexOf("@theme sfumato", StringComparison.Ordinal);
-	        
-		    if (sfumatoBlockStart < 0)
+	        SfumatoCssBlock = CssContent.ExtractCssBlock("@layer sfumato");
+
+		    if (string.IsNullOrEmpty(SfumatoCssBlock))
 		    {
-			    Console.WriteLine($"{AppState.CliErrorPrefix}No @theme sfumato {{}} block in file: {CssFilePath}");
-			    Environment.Exit(1);
+			    SfumatoCssBlock = CssContent.ExtractCssBlock("@theme sfumato");
+
+			    if (string.IsNullOrEmpty(SfumatoCssBlock))
+			    {
+				    Console.WriteLine($"{AppState.CliErrorPrefix}No @layer sfumato {{ :root {{ }} }} block in file: {CssFilePath}");
+				    Environment.Exit(1);
+			    }
 		    }
 
-		    var openBraceIndex = CssContent.IndexOf('{', sfumatoBlockStart);
-	        
-		    if (openBraceIndex <= sfumatoBlockStart)
-		    {
-			    Console.WriteLine($"{AppState.CliErrorPrefix}@theme sfumato block has no opening {{ in file: {CssFilePath}");
-			    Environment.Exit(1);
-		    }
-
-			var braceCount = 0;
-			var closingBraceIndex = -1;
-
-			for (var i = openBraceIndex; i < CssContent.Length; i++)
-			{
-				if (closingBraceIndex > -1)
-					break;
-				
-				if (CssContent[i] == '{')
-					braceCount++;
-				else if (CssContent[i] == '}')
-					braceCount--;
-
-				if (braceCount == 0)
-					closingBraceIndex = i;
-			}
-
-			if (closingBraceIndex < 0)
-			{
-				Console.WriteLine($"{AppState.CliErrorPrefix}@theme sfumato block has no closing }} in file: {CssFilePath}");
-				Environment.Exit(1);
-			}
-
-			SfumatoCssBlock = CssContent[sfumatoBlockStart..(closingBraceIndex + 1)];
-			ProcessedCssContent = CssContent.Replace(SfumatoCssBlock, string.Empty);
+		    ProcessedCssContent = CssContent.Replace(SfumatoCssBlock, string.Empty);
 
 	        #endregion
 	    }
@@ -307,6 +280,7 @@ public sealed class AppRunnerSettings(AppRunner? appRunner)
 	    }
 	    
 	    var sb = AppRunner.AppState.StringBuilderPool.Get();
+	    var workingSb = AppRunner.AppState.StringBuilderPool.Get();
 	    var filePath = string.Empty;
 
 	    sb.Append(css);
@@ -318,7 +292,25 @@ public sealed class AppRunnerSettings(AppRunner? appRunner)
 		    while (importIndex > -1)
 		    {
 			    var importStatement = css[importIndex..(css.IndexOf(';', importIndex) + 1)];
-			    var importPath = importStatement.Replace("@import", string.Empty).Trim().Trim(';').Trim('\"').SetNativePathSeparators();
+			    var parsePath = importStatement[(importIndex + 8)..].Trim().Trim(';').Trim();
+			    var importPath = string.Empty;
+			    var layerName = string.Empty;
+
+			    if (parsePath.EndsWith('\'') == false && parsePath.EndsWith('\"') == false)
+			    {
+				    var segments = parsePath.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+				    if (segments.Length > 1)
+				    {
+					    layerName = segments.Last();
+					    importPath = parsePath.Replace(layerName, string.Empty).Trim().Trim('\'').Trim('\"')
+						    .SetNativePathSeparators();
+				    }
+			    }
+			    else
+			    {
+				    importPath = parsePath.Trim('\'').Trim('\"').SetNativePathSeparators();
+			    }			    
 			    
 			    filePath = Path.GetFullPath(Path.Combine(parentPath, importPath));
 
@@ -333,9 +325,15 @@ public sealed class AppRunnerSettings(AppRunner? appRunner)
 				    Imports.Add(new FileInfo(filePath));
 
 				    var childCss = File.ReadAllText(filePath);
-				    var injectedCss = ImportPartials(childCss, Path.GetDirectoryName(filePath) ?? string.Empty);
+				    workingSb.Append(ImportPartials(childCss, Path.GetDirectoryName(filePath) ?? string.Empty));
 
-				    sb.Replace(importStatement, injectedCss);
+				    if (string.IsNullOrEmpty(layerName) == false)
+				    {
+					    workingSb.Insert(0, $"@layer {layerName} {{{LineBreak}");
+					    workingSb.Append($"}}{LineBreak}");
+				    }
+
+				    sb.Replace(importStatement, workingSb.ToString());
 			    }
 
 			    if (importIndex >= css.Length - 1)
@@ -354,6 +352,7 @@ public sealed class AppRunnerSettings(AppRunner? appRunner)
 	    finally
 	    {
 		    AppRunner.AppState.StringBuilderPool.Return(sb);
+		    AppRunner.AppState.StringBuilderPool.Return(workingSb);
 	    }
 
 	    return css;

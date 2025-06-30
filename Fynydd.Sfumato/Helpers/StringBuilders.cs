@@ -8,6 +8,89 @@ namespace Fynydd.Sfumato.Helpers;
 public static class StringBuilders
 {
 	/// <summary>
+	/// Extract a block of CSS by its starting declaration (e.g. "@layer components").
+	/// </summary>
+	/// <param name="sourceCss"></param>
+	/// <param name="cssBlockStart"></param>
+	/// <returns></returns>
+	public static string ExtractCssBlock(this StringBuilder sourceCss, string cssBlockStart)
+	{
+		var blockStart = sourceCss.IndexOf(cssBlockStart);
+
+		if (blockStart < 0)
+			return string.Empty;
+
+		var openBraceIndex = sourceCss.IndexOf('{', blockStart);
+        
+		if (openBraceIndex <= blockStart)
+			return string.Empty;
+
+		var braceCount = 0;
+		var closingBraceIndex = -1;
+
+		for (var i = openBraceIndex; i < sourceCss.Length; i++)
+		{
+			if (closingBraceIndex > -1)
+				break;
+			
+			// ReSharper disable once ConvertIfStatementToSwitchStatement
+			if (sourceCss[i] == '{')
+				braceCount++;
+			else if (sourceCss[i] == '}')
+				braceCount--;
+
+			if (braceCount == 0)
+				closingBraceIndex = i;
+		}
+
+		return closingBraceIndex < 0 ? string.Empty : sourceCss.Substring(blockStart, closingBraceIndex - blockStart + 1);
+	}
+
+	/// <summary>
+	/// Find the index of a character in a StringBuilder starting at a given index.
+	/// </summary>
+	/// <param name="sb"></param>
+	/// <param name="value"></param>
+	/// <param name="startIndex"></param>
+	/// <returns></returns>
+	public static int IndexOf(this StringBuilder? sb, char value, int startIndex = 0)
+	{
+		if (sb == null || startIndex < 0 || startIndex >= sb.Length)
+			return -1;
+
+		for (var i = startIndex; i < sb.Length; i++)
+		{
+			if (sb[i] == value)
+				return i;
+		}
+
+		return -1;
+	}
+	
+	/// <summary>
+	/// Find the index a substring in a StringBuilder.
+	/// </summary>
+	/// <param name="sb"></param>
+	/// <param name="value"></param>
+	/// <param name="comparisonType"></param>
+	/// <returns></returns>
+	public static int IndexOf(this StringBuilder? sb, string? value, StringComparison comparisonType = StringComparison.Ordinal)
+	{
+		if (sb == null || string.IsNullOrEmpty(value) || sb.Length < value.Length)
+			return -1;
+
+		for (var i = 0; i <= sb.Length - value.Length; i++)
+		{
+			var found = value.Where((t, j) => sb[i + j].ToString().Equals(t.ToString(), comparisonType) == false).Any() == false;
+
+			if (found)
+				return i;
+		}
+
+		return -1;
+	}
+	
+	/// <summary>
 	/// Reformats the CSS in this StringBuilder so that each block is indented
 	/// by <paramref name="indentSize"/> spaces per nesting level.
 	/// Also, properly indents /* … */ comments (both standalone and inline).
