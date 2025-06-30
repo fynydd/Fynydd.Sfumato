@@ -1,5 +1,3 @@
-using Fynydd.Sfumato.Entities.Library;
-
 namespace Fynydd.Sfumato.Tests;
 
 public class ExportTests(ITestOutputHelper testOutputHelper)
@@ -7,7 +5,7 @@ public class ExportTests(ITestOutputHelper testOutputHelper)
     [Fact]
     public async Task ExportJsonAsync()
     {
-        var appRunner = new AppRunner(new AppState(), "../../../SampleCss/sample.css");
+        var appRunner = new AppRunner(new AppState(), "../../../SampleCss/export.css");
 
         await appRunner.LoadCssFileAsync();
         
