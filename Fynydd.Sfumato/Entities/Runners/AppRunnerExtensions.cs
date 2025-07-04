@@ -10,32 +10,24 @@ public static class AppRunnerExtensions
 	/// <returns></returns>
 	public static StringBuilder AppendResetCss(this StringBuilder sourceCss, AppRunner appRunner)
 	{
-		try
+		if (appRunner.AppRunnerSettings.UseReset)
 		{
-			if (appRunner.AppRunnerSettings.UseReset)
-			{
-				if (appRunner.AppRunnerSettings.UseCompatibilityMode == false)
-					sourceCss
-						.Append("@layer base {")
-						.Append(appRunner.AppRunnerSettings.LineBreak)
-						.Append(appRunner.AppRunnerSettings.LineBreak);	
-				
+			if (appRunner.AppRunnerSettings.UseCompatibilityMode == false)
 				sourceCss
-					.Append(File.ReadAllText(Path.Combine(appRunner.AppState.EmbeddedCssPath, "browser-reset.css")).NormalizeLinebreaks(appRunner.AppRunnerSettings.LineBreak).Trim())
+					.Append("@layer base {")
+					.Append(appRunner.AppRunnerSettings.LineBreak)
+					.Append(appRunner.AppRunnerSettings.LineBreak);	
+			
+			sourceCss
+				.Append(appRunner.BrowserResetCss)
+				.Append(appRunner.AppRunnerSettings.LineBreak)
+				.Append(appRunner.AppRunnerSettings.LineBreak);
+			
+			if (appRunner.AppRunnerSettings.UseCompatibilityMode == false)
+				sourceCss
+					.Append('}')
 					.Append(appRunner.AppRunnerSettings.LineBreak)
 					.Append(appRunner.AppRunnerSettings.LineBreak);
-				
-				if (appRunner.AppRunnerSettings.UseCompatibilityMode == false)
-					sourceCss
-						.Append('}')
-						.Append(appRunner.AppRunnerSettings.LineBreak)
-						.Append(appRunner.AppRunnerSettings.LineBreak);
-			}
-		}		
-		catch (Exception e)
-		{
-			Console.WriteLine($"{AppState.CliErrorPrefix}AppendResetCss() - {e.Message}");
-			Environment.Exit(1);
 		}
 
 		return sourceCss;
@@ -60,7 +52,7 @@ public static class AppRunnerExtensions
 						.Append(appRunner.AppRunnerSettings.LineBreak);	
 
 				sourceCss
-					.Append(File.ReadAllText(Path.Combine(appRunner.AppState.EmbeddedCssPath, "forms.css")).NormalizeLinebreaks(appRunner.AppRunnerSettings.LineBreak).Trim())
+					.Append(appRunner.FormsCss)
 					.Append(appRunner.AppRunnerSettings.LineBreak)
 					.Append(appRunner.AppRunnerSettings.LineBreak);
 				
@@ -351,7 +343,7 @@ public static class AppRunnerExtensions
 		{
 			ProcessTrackedDependencyValues(appRunner);
 
-			if (appRunner.UsedCssCustomProperties.IsEmpty == false)
+			if (appRunner.UsedCssCustomProperties.Count > 0)
 			{
 				#region @layer properties
 				
@@ -368,6 +360,9 @@ public static class AppRunnerExtensions
 
 				foreach (var ccp in appRunner.UsedCssCustomProperties.Where(c => (c.Key.StartsWith("--sf-") || c.Key.StartsWith("--form-")) && string.IsNullOrEmpty(c.Value) == false).OrderBy(c => c.Key))
 				{
+					if (appRunner.AppRunnerSettings.UseForms == false && ccp.Key.StartsWith("--form-"))
+						continue;
+					
 					workingSb
 						.Append(ccp.Key)
 						.Append(": ")
@@ -499,7 +494,7 @@ public static class AppRunnerExtensions
 			WrapperCss = string.Empty
 		};
 
-		foreach (var cssClass in appRunner.UtilityClasses.Values.OrderBy(c => c.WrapperSort))
+		foreach (var cssClass in appRunner.UtilityClasses.Values.OrderBy(c => c.WrapperSort).ThenBy(c => c.SelectorSort))
 			_ProcessVariantBranchRecursive(root, cssClass);
 		
 		var sb = appRunner.AppState.StringBuilderPool.Get();
@@ -533,198 +528,6 @@ public static class AppRunnerExtensions
 		}
 		
 		return sourceCss;
-	}
-
-	public static StringBuilder MoveComponentsLayer(this StringBuilder sourceCss, AppRunner appRunner)
-	{
-		if (appRunner.AppRunnerSettings.UseCompatibilityMode)
-			return sourceCss;
-
-		var utilitiesBlockStart = sourceCss.IndexOf("@layer utilities");
-
-		if (utilitiesBlockStart < 0)
-			return sourceCss;
-
-		var componentsLayer = sourceCss.ExtractCssBlock("@layer components");
-		var sb = appRunner.AppState.StringBuilderPool.Get();
-
-		try
-		{
-			while (string.IsNullOrEmpty(componentsLayer) == false)
-			{
-				sourceCss.Replace(componentsLayer, string.Empty);
-
-				sb.Append(componentsLayer.TrimStart("@layer components")?.Trim().TrimFirst('{').TrimLast('}').Trim());
-				sb.Append(appRunner.AppRunnerSettings.LineBreak);
-				sb.Append(appRunner.AppRunnerSettings.LineBreak);
-
-				componentsLayer = sourceCss.ExtractCssBlock("@layer components");
-			}
-
-			if (sb.Length == 0)
-				return sourceCss;
-
-			sb.Insert(0, "@layer components {" + appRunner.AppRunnerSettings.LineBreak);
-			sb.Append("}" + appRunner.AppRunnerSettings.LineBreak);
-			
-			sourceCss.Insert(utilitiesBlockStart, sb);
-		}
-		finally
-		{
-			appRunner.AppState.StringBuilderPool.Return(sb);
-		}
-
-		return sourceCss;
-	}
-	
-	/// <summary>
-	/// Find all dark theme media blocks and duplicate as wrapped classes theme-dark
-	/// </summary>
-	/// <param name="sourceCss"></param>
-	/// <param name="appRunner"></param>
-	/// <returns></returns>
-	public static StringBuilder ProcessDarkThemeClasses(this StringBuilder sourceCss, AppRunner appRunner)
-	{
-		var workingSb = appRunner.AppState.StringBuilderPool.Get();
-		var darkSb = appRunner.AppState.StringBuilderPool.Get();
-		
-		const string blockPrefix = "@media (prefers-color-scheme: dark) {";
-
-		char[] selectorPrefixes = [ '.', '#', '[', ':', '*', '>', '+', '~' ];
-		string[] prefixes = [ " ", appRunner.AppRunnerSettings.LineBreak, "\t", ",", "}", "{" ];
-		string[] suffixes = [ " ", appRunner.AppRunnerSettings.LineBreak, "\t", ",", "{" ];
-
-		try
-		{
-			foreach (var block in sourceCss.ToString().FindMediaBlocks(blockPrefix))
-			{
-				workingSb.Clear();
-				workingSb.Append(block.Trim());
-
-				darkSb.Clear();
-				darkSb.Append(block.Trim());
-				darkSb.TrimStart(blockPrefix);
-				darkSb.Trim();
-				
-				if (darkSb.Length > 0 && darkSb[^1] == '}')
-					darkSb.Remove(darkSb.Length - 1, 1);
-
-				var distinctSelectors = block.GetCssSelectors().Distinct().ToList();
-				
-				foreach (var selector in distinctSelectors)
-				{
-					if (selector.StartsWithAny(selectorPrefixes))
-					{
-						foreach (var suffix in suffixes)
-						{
-							var sel = $"{selector}{suffix}";
-
-							if (workingSb.StartsWith(sel))
-								workingSb.Remove(0, sel.Length).Insert(0, $".theme-auto ---{selector}---, .theme-auto---{selector}---{suffix}");
-	
-							if (darkSb.StartsWith(sel))
-								darkSb.Remove(0, sel.Length).Insert(0, $".theme-dark ---{selector}---, .theme-dark---{selector}---{suffix}");
-						}
-
-						foreach (var prefix in prefixes)
-						{
-							foreach (var suffix in suffixes)
-							{
-								workingSb.Replace($"{prefix}{selector}{suffix}", $"{prefix}.theme-auto ---{selector}---, .theme-auto---{selector}---{suffix}");
-								darkSb.Replace($"{prefix}{selector}{suffix}", $"{prefix}.theme-dark ---{selector}---, .theme-dark---{selector}---{suffix}");
-							}
-						}
-					}
-					else
-					{
-						foreach (var suffix in suffixes)
-						{
-							var sel = $"{selector}{suffix}";
-
-							if (workingSb.StartsWith(sel))
-								workingSb.Remove(0, sel.Length).Insert(0, $".theme-auto ---{selector}---{suffix}");
-	
-							if (darkSb.StartsWith(sel))
-								darkSb.Remove(0, sel.Length).Insert(0, $".theme-dark ---{selector}---{suffix}");
-						}
-
-						foreach (var prefix in prefixes)
-						{
-							foreach (var suffix in suffixes)
-							{
-								workingSb.Replace($"{prefix}{selector}{suffix}", $"{prefix}.theme-auto ---{selector}---{suffix}");
-								darkSb.Replace($"{prefix}{selector}{suffix}", $"{prefix}.theme-dark ---{selector}---{suffix}");
-							}
-						}
-					}
-				}
-
-				foreach (var selector in distinctSelectors)
-				{
-					workingSb.Replace($"---{selector}---", selector);
-					darkSb.Replace($"---{selector}---", selector);
-				}
-
-				workingSb
-					.Append(appRunner.AppRunnerSettings.LineBreak)
-					.Append(appRunner.AppRunnerSettings.LineBreak)
-					.Append(darkSb);
-				
-				sourceCss.Replace(block, workingSb.ToString());
-			}
-		}
-		catch (Exception e)
-		{
-			Console.WriteLine($"{AppState.CliErrorPrefix}ProcessDarkThemeClasses() - {e.Message}");
-			Environment.Exit(1);
-		}
-		finally
-		{
-			appRunner.AppState.StringBuilderPool.Return(workingSb);
-			appRunner.AppState.StringBuilderPool.Return(darkSb);
-		}
-		
-		return sourceCss;
-	}
-	
-	/// <summary>
-	/// Recursive method for traversing the variant tree and generating utility class CSS.
-	/// </summary>
-	/// <param name="branch"></param>
-	/// <param name="workingSb"></param>
-	private static void _GenerateUtilityClassesCss(VariantBranch branch, StringBuilder workingSb)
-	{
-		try
-		{
-			var isWrapped = string.IsNullOrEmpty(branch.WrapperCss) == false;
-			
-			if (isWrapped)
-				workingSb.Append(branch.WrapperCss);
-			
-			foreach (var cssClass in branch.CssClasses.OrderBy(c => c.SelectorSort))
-				workingSb
-					.Append(cssClass.EscapedSelector)
-					.Append(" {")
-					.Append(cssClass.Styles)
-					.Append('}');
-
-			if (branch.Branches.Count > 0)
-			{
-				foreach (var subBranch in branch.Branches)
-					_GenerateUtilityClassesCss(subBranch, workingSb);
-			}
-
-			if (string.IsNullOrEmpty(branch.WrapperCss))
-				return;
-			
-			workingSb
-				.Append('}');
-		}
-		catch (Exception e)
-		{
-			Console.WriteLine($"{AppState.CliErrorPrefix}_GenerateUtilityClassesCss() - {e.Message}");
-			Environment.Exit(1);
-		}
 	}
 
 	/// <summary>
@@ -767,6 +570,423 @@ public static class AppRunnerExtensions
 		catch (Exception e)
 		{
 			Console.WriteLine($"{AppState.CliErrorPrefix}_ProcessVariantBranchRecursive() - {e.Message}");
+			Environment.Exit(1);
+		}
+	}
+
+	public static StringBuilder MoveComponentsLayer(this StringBuilder sourceCss, AppRunner appRunner)
+	{
+		if (appRunner.AppRunnerSettings.UseCompatibilityMode)
+			return sourceCss;
+
+		const string COMPONENTS = "@layer components";
+		const string UTILITIES = "@layer utilities";
+
+		var componentsSb = appRunner.AppState.StringBuilderPool.Get();
+		var rewrittenSb = new StringBuilder(sourceCss.Length);
+
+		try
+		{
+			componentsSb.Clear();
+
+			var css = sourceCss.ToString();
+			var pos = 0;
+
+			// single pass over the original CSS
+			while (true)
+			{
+				var compIdx = css.IndexOf(COMPONENTS, pos, StringComparison.Ordinal);
+
+				if (compIdx < 0)
+				{
+					// copy the tail & finish
+					rewrittenSb.Append(css, pos, css.Length - pos);
+					break;
+				}
+
+				// 1. copy everything *before* this @layer components verbatim
+				rewrittenSb.Append(css, pos, compIdx - pos);
+
+				// 2. parse the block to collect its body
+				var i = compIdx + COMPONENTS.Length;
+
+				// skip whitespace
+				while (i < css.Length && char.IsWhiteSpace(css[i]))
+					i++;
+
+				if (i >= css.Length || css[i] != '{')
+				{
+					// malformed – treat the keyword as plain text and continue
+					rewrittenSb.Append(COMPONENTS);
+					pos = i;
+
+					continue;
+				}
+
+				var contentStart = ++i; // skip '{'
+				var depth = 1;
+
+				while (i < css.Length && depth > 0)
+				{
+					var c = css[i++];
+
+					if (c == '{')
+						depth++;
+					else if (c == '}')
+						depth--;
+				}
+
+				var contentEnd = i - 1; // position of the matching '}'
+
+				if (contentEnd > contentStart)
+				{
+					componentsSb.Append(css, contentStart, contentEnd - contentStart);
+					componentsSb.Append(appRunner.AppRunnerSettings.LineBreak);
+				}
+
+				pos = contentEnd + 1; // continue after the block we removed
+			}
+
+			// no components blocks?  just return the source unchanged
+			if (componentsSb.Length == 0)
+				return sourceCss;
+
+			// wrap the gathered body into a single @layer components { … }
+			componentsSb.Insert(0, COMPONENTS + " {" + appRunner.AppRunnerSettings.LineBreak);
+			componentsSb.Append('}').Append(appRunner.AppRunnerSettings.LineBreak);
+
+			// insert before the first @layer utilities, or at the end
+			var utilitiesPos = rewrittenSb.IndexOf(UTILITIES, 0, StringComparison.Ordinal);
+
+			if (utilitiesPos < 0)
+				rewrittenSb.Append(componentsSb);
+			else
+				rewrittenSb.Insert(utilitiesPos, componentsSb);
+
+			// overwrite the incoming StringBuilder and hand it back
+			sourceCss.Clear().Append(rewrittenSb);
+
+			return sourceCss;
+		}
+		finally
+		{
+			appRunner.AppState.StringBuilderPool.Return(componentsSb);
+		}
+	}
+
+	/// <summary>
+	/// Find all dark theme media blocks and duplicate as wrapped classes theme-dark
+	/// </summary>
+	/// <param name="sourceCss"></param>
+	/// <param name="appRunner"></param>
+	/// <returns></returns>
+	public static StringBuilder ProcessDarkThemeClasses(this StringBuilder sourceCss, AppRunner appRunner)
+	{
+		const string MEDIA_PREFIX = "@media (prefers-color-scheme: dark) {";
+
+		var outCss = new StringBuilder(sourceCss.Length * 2);
+		var css = sourceCss.ToString();
+		var pos = 0;
+
+		while (true)
+		{
+			int mediaIdx = css.IndexOf(MEDIA_PREFIX, pos, StringComparison.Ordinal);
+
+			if (mediaIdx < 0)
+			{
+				// no more blocks – copy the tail and finish
+				outCss.Append(css, pos, css.Length - pos);
+				break;
+			}
+
+			// 1) copy everything before this @media as-is
+			outCss.Append(css, pos, mediaIdx - pos);
+
+			// 2) locate the matching '}' that closes the @media
+			var bodyStart = mediaIdx + MEDIA_PREFIX.Length;
+			var p = bodyStart;
+			var depth = 1; // we are just after the '{'
+
+			while (p < css.Length && depth > 0)
+			{
+				var c = css[p++];
+
+				if (c == '{')
+					depth++;
+				else if (c == '}')
+					depth--;
+			}
+
+			var bodyEnd = p - 1; // index of the '}' that closes the @media
+			var inner = css.AsSpan(bodyStart, bodyEnd - bodyStart);
+
+			// 3) rewrite the whole inner block in ONE pass
+			var autoSb = appRunner.AppState.StringBuilderPool.Get();
+			var darkSb = appRunner.AppState.StringBuilderPool.Get();
+
+			try
+			{
+				autoSb.Clear();
+				darkSb.Clear();
+
+				RewriteContent(inner, autoSb, darkSb);
+
+				// @media with ".theme-auto…" selectors
+				outCss.Append(MEDIA_PREFIX).Append(autoSb).Append('}');
+
+				// blank line between the two copies (match original behaviour)
+				outCss.Append(appRunner.AppRunnerSettings.LineBreak)
+					  .Append(appRunner.AppRunnerSettings.LineBreak);
+
+				// ".theme-dark…" selectors outside any media query
+				outCss.Append(darkSb);
+			}
+			finally
+			{
+				appRunner.AppState.StringBuilderPool.Return(autoSb);
+				appRunner.AppState.StringBuilderPool.Return(darkSb);
+			}
+
+			pos = bodyEnd + 1; // skip the original @media block
+		}
+
+		sourceCss.Clear().Append(outCss);
+
+		return sourceCss;
+
+		// recursively rewrites one block body
+		static void RewriteContent(ReadOnlySpan<char> src, StringBuilder autoSb, StringBuilder darkSb)
+		{
+			var i = 0;
+
+			while (i < src.Length)
+			{
+				// copy leading whitespace verbatim
+				var headerStart = i;
+
+				while (headerStart < src.Length && char.IsWhiteSpace(src[headerStart]))
+				{
+					autoSb.Append(src[headerStart]);
+					darkSb.Append(src[headerStart]);
+					headerStart++;
+				}
+
+				if (headerStart >= src.Length)
+					return;
+
+				i = headerStart;
+
+				// find the next '{' that starts the rule
+				var braceRel = src[i..].IndexOf('{');
+
+				if (braceRel < 0) // malformed CSS – bail out
+				{
+					autoSb.Append(src[i..]);
+					darkSb.Append(src[i..]);
+
+					return;
+				}
+
+				var bracePos = i + braceRel;
+				var headerSpan = src.Slice(i, braceRel);
+
+				// find the matching '}' for this rule
+				var contentStart = bracePos + 1;
+				var depth = 1;
+				var p = contentStart;
+
+				while (p < src.Length && depth > 0)
+				{
+					var c = src[p++];
+
+					if (c == '{')
+						depth++;
+					else if (c == '}')
+						depth--;
+				}
+
+				var contentEnd = p - 1; // position of '}'
+				var ruleContent = src[contentStart..contentEnd];
+				var isAtRule = headerSpan.TrimStart().Length > 0 && headerSpan.TrimStart()[0] == '@';
+
+				if (isAtRule)
+				{
+					// copy @-rules unchanged, but rewrite inside them
+					autoSb.Append(headerSpan).Append('{');
+					darkSb.Append(headerSpan).Append('{');
+
+					RewriteContent(ruleContent, autoSb, darkSb);
+
+					autoSb.Append('}');
+					darkSb.Append('}');
+				}
+				else
+				{
+					// selector list: add the two theme prefixes
+					var selectors = new List<string>();
+					AddSelectors(headerSpan, selectors);
+
+					var first = true;
+
+					foreach (var sel in selectors)
+					{
+						if (first == false)
+						{
+							autoSb.Append(", ");
+							darkSb.Append(", ");
+						}
+
+						first = false;
+
+						var needsTwo = NeedsDoubleForm(sel);
+
+						autoSb.Append(".theme-auto ").Append(sel);
+
+						if (needsTwo)
+							autoSb.Append(", .theme-auto").Append(sel);
+
+						darkSb.Append(".theme-dark ").Append(sel);
+
+						if (needsTwo)
+							darkSb.Append(", .theme-dark").Append(sel);
+					}
+
+					autoSb.Append(" {");
+					darkSb.Append(" {");
+
+					// copy rule body verbatim
+					autoSb.Append(ruleContent);
+					darkSb.Append(ruleContent);
+
+					autoSb.Append('}');
+					darkSb.Append('}');
+				}
+
+				i = contentEnd + 1; // continue after this rule
+			}
+		}
+
+		// does the selector need the “no space” twin?
+		static bool NeedsDoubleForm(string sel)
+		{
+			if (string.IsNullOrEmpty(sel))
+				return false;
+
+			return sel[0] switch
+			{
+				'.' or '#' or '[' or ':' or '*' or '>' or '+' or '~' => true,
+				_ => false,
+			};
+		}
+
+		// split a selector list on top-level (unescaped) commas
+		static void AddSelectors(ReadOnlySpan<char> header, List<string> output)
+		{
+			var paren = 0;
+			var square = 0;
+			var start = 0;
+
+			var quoteChar = '\0';
+
+			var inQuote = false;
+			var escaped = false;
+
+			for (var i = 0; i < header.Length; i++)
+			{
+				var c = header[i];
+
+				if (escaped)
+				{
+					escaped = false;
+					continue;
+				}
+
+				if (c == '\\')
+				{
+					escaped = true;
+					continue;
+				}
+
+				if (inQuote)
+				{
+					if (c == quoteChar)
+						inQuote = false;
+
+					continue;
+				}
+
+				if (c == '"' || c == '\'')
+				{
+					inQuote = true;
+					quoteChar = c;
+
+					continue;
+				}
+
+				switch (c)
+				{
+					case '(': paren++; break;
+					case ')': if (paren > 0) paren--; break;
+					case '[': square++; break;
+					case ']': if (square > 0) square--; break;
+					case ',':
+						if (paren == 0 && square == 0)
+						{
+							var sel = header[start..i].Trim();
+
+							if (sel.IsEmpty == false)
+								output.Add(sel.ToString());
+
+							start = i + 1;
+						}
+
+						break;
+				}
+			}
+
+			var tail = header[start..].Trim();
+
+			if (tail.IsEmpty == false)
+				output.Add(tail.ToString());
+		}
+	}
+
+	/// <summary>
+	/// Recursive method for traversing the variant tree and generating utility class CSS.
+	/// </summary>
+	/// <param name="branch"></param>
+	/// <param name="workingSb"></param>
+	private static void _GenerateUtilityClassesCss(VariantBranch branch, StringBuilder workingSb)
+	{
+		try
+		{
+			var isWrapped = string.IsNullOrEmpty(branch.WrapperCss) == false;
+
+			if (isWrapped)
+				workingSb.Append(branch.WrapperCss);
+
+			foreach (var cssClass in branch.CssClasses.OrderBy(c => c.SelectorSort).ThenBy(c => c.ClassDefinition?.NameSortOrder ?? 0).ThenBy(c => c.Selector))
+				workingSb
+					.Append(cssClass.EscapedSelector)
+					.Append(" {")
+					.Append(cssClass.Styles)
+					.Append('}');
+
+			if (branch.Branches.Count > 0)
+			{
+				foreach (var subBranch in branch.Branches)
+					_GenerateUtilityClassesCss(subBranch, workingSb);
+			}
+
+			if (string.IsNullOrEmpty(branch.WrapperCss))
+				return;
+
+			workingSb
+				.Append('}');
+		}
+		catch (Exception e)
+		{
+			Console.WriteLine($"{AppState.CliErrorPrefix}_GenerateUtilityClassesCss() - {e.Message}");
 			Environment.Exit(1);
 		}
 	}
