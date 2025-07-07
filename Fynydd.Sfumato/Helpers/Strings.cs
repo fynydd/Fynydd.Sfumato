@@ -1,5 +1,7 @@
 ﻿// ReSharper disable MemberCanBePrivate.Global
 
+using System.Runtime.CompilerServices;
+
 namespace Fynydd.Sfumato.Helpers;
 
 /// <summary>
@@ -171,6 +173,79 @@ public static partial class Strings
 	#endregion
 	
 	#region Trimming
+	
+	/// <summary>
+	/// Trims any of the specified characters from the start and end of the span.
+	/// </summary>
+	public static ReadOnlySpan<char> Trim(this ReadOnlySpan<char> span, params char[]? trimChars)
+	{
+		if (span.IsEmpty || trimChars is null || trimChars.Length == 0)
+			return span;
+
+		var start = 0;
+		var end   = span.Length - 1;
+
+		// advance start past any trimChar
+		while (start <= end && IsTrimChar(span[start], trimChars))
+			start++;
+
+		// retreat end before any trimChar
+		while (end >= start && IsTrimChar(span[end], trimChars))
+			end--;
+
+		// if nothing left, return empty; else slice
+		return start == 0 && end == span.Length - 1
+			? span
+			: span.Slice(start, end - start + 1);
+	}
+
+	/// <summary>
+	/// Trims any of the specified characters from the start of the span.
+	/// </summary>
+	public static ReadOnlySpan<char> TrimStart(this ReadOnlySpan<char> span, params char[]? trimChars)
+	{
+		if (span.IsEmpty || trimChars is null || trimChars.Length == 0)
+			return span;
+
+		var start = 0;
+	
+		while (start < span.Length && IsTrimChar(span[start], trimChars))
+			start++;
+
+		// If nothing trimmed, return original; else slice from `start` to end.
+		return start == 0
+			? span
+			: span[start..];
+	}
+	
+	/// <summary>
+	/// Trims any of the specified characters from the end of the span.
+	/// </summary>
+	public static ReadOnlySpan<char> TrimEnd(this ReadOnlySpan<char> span, params char[]? trimChars)
+	{
+		if (span.IsEmpty || trimChars is null || trimChars.Length == 0)
+			return span;
+
+		var end = span.Length - 1;
+		
+		while (end >= 0 && IsTrimChar(span[end], trimChars))
+			end--;
+
+		// If nothing trimmed, return original; else slice from 0 up to end+1.
+		return end == span.Length - 1
+			? span
+			: span[..(end + 1)];
+	}
+	
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static bool IsTrimChar(char c, char[] trimChars)
+	{
+		// a tiny linear scan is usually fastest for small trim arrays
+		foreach (var t in trimChars)
+			if (c == t) return true;
+
+		return false;
+	}
 	
 	/// <summary>
 	/// Trim the first occurrence of a character from a string.
@@ -547,6 +622,7 @@ public static partial class Strings
 	}
 
     // splits a comma‑separated selector string at commas not inside [],(), or quotes
+    // ReSharper disable once UnusedMember.Local
     private static IEnumerable<string> SplitSelectors(string header)
     {
         if (string.IsNullOrWhiteSpace(header))
@@ -899,7 +975,7 @@ public static partial class Strings
     /// Removes SPACE and TAB characters that appear <em>immediately</em> before
     /// an LF (<c>"\n"</c>) or CRLF (<c>"\r\n"</c>) sequence.
     /// </summary>
-    /// <param name="text">Input string (may be <c>null</c> or empty).</param>
+    /// <param name="text">Input string (it may be <c>null</c> or empty).</param>
     /// <param name="scratch">
     /// Optional <see cref="StringBuilder"/> taken from an <em>ObjectPool</em>.  
     /// If supplied, it is cleared up-front and used only when a rewrite
@@ -1438,50 +1514,123 @@ public static partial class Strings
 	}
 	
 	/// <summary>
-	/// Normalize line breaks.
+	/// Normalize all “\r\n”, “\r”, and “\n” sequences into the specified linebreak,
+	/// doing at most one allocation and two scans.
 	/// </summary>
-	/// <param name="value"></param>
-	/// <param name="linebreak">Line break to use (default: "\n")</param>
 	public static string NormalizeLinebreaks(this string value, string linebreak = "\n")
 	{
-		if (value.IsEmpty())
-			return string.Empty;
+	    if (string.IsNullOrEmpty(value))
+	        return string.Empty;
 
-		if (value.Contains('\r'))
-		{
-			if (linebreak != "\r\n")
-				return value.Replace("\r\n", linebreak);
-		}
+	    var len = value.Length;
+	    var countCrlf = 0;
+		var countSingle = 0;
 
-		else
-		{
-			if (linebreak != "\n")
-				return value.Replace("\n", linebreak);
-		}
-		
-		return value;        
+	    // First pass: count how many CRLF vs. lone CR or LF we have
+	    for (var i = 0; i < len; i++)
+	    {
+	        var c = value[i];
+	        
+	        if (c == '\r')
+	        {
+	            if (i + 1 < len && value[i + 1] == '\n')
+	            {
+	                countCrlf++;
+	                i++;
+	            }
+	            else
+	            {
+	                countSingle++;
+	            }
+	        }
+	        else if (c == '\n')
+	        {
+	            countSingle++;
+	        }
+	    }
+
+	    // Nothing to normalize?
+	    if (countCrlf == 0 && countSingle == 0)
+	        return value;
+
+	    var breakLen = linebreak.Length;
+	    
+	    // Compute new length:
+	    //   remove 2 chars per CRLF, 1 per lone CR or LF
+	    //   then add back breakLen chars per token
+	    var newLen = len
+	                 - (countCrlf * 2 + countSingle * 1)
+	                 + (countCrlf + countSingle) * breakLen;
+
+	    // Second pass: fill directly into the new string’s buffer
+	    return string.Create(newLen, (value, linebreak), (span, state) =>
+	    {
+	        var (src, br) = state;
+	        var dst = 0;
+
+	        for (var i = 0; i < src.Length; i++)
+	        {
+	            var c = src[i];
+	            
+	            if (c == '\r')
+	            {
+	                if (i + 1 < src.Length && src[i + 1] == '\n')
+	                {
+	                    // CRLF
+	                    for (var j = 0; j < br.Length; j++)
+	                        span[dst + j] = br[j];
+	                    dst += br.Length;
+	                    i++;
+	                }
+	                else
+	                {
+	                    // lone CR
+	                    for (var j = 0; j < br.Length; j++)
+	                        span[dst + j] = br[j];
+	                    dst += br.Length;
+	                }
+	            }
+	            else if (c == '\n')
+	            {
+	                // lone LF
+	                for (var j = 0; j < br.Length; j++)
+	                    span[dst + j] = br[j];
+	                dst += br.Length;
+	            }
+	            else
+	            {
+	                span[dst++] = c;
+	            }
+	        }
+	    });
 	}
 
 	/// <summary>
-	/// Normalize path separators to those used by the current OS.
+	/// Normalize both ‘/’ and ‘\’ to the native directory separator in one pass.
 	/// </summary>
-	/// <param name="value"></param>
-	public static string SetNativePathSeparators(this string value)
+	public static string SetNativePathSeparators(this string path)
 	{
-		if (string.IsNullOrEmpty(value))
+		if (string.IsNullOrEmpty(path))
 			return string.Empty;
 
-		var path = value;
+		// If there are no separators, return the original string
+		if (path.IndexOfAny(['/', '\\']) < 0)
+			return path;
 
-		path = path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-		
-		if (Path.DirectorySeparatorChar != '/')
-			path = path.Replace('/', Path.DirectorySeparatorChar);
+		var sep = Path.DirectorySeparatorChar;
 
-		if (Path.DirectorySeparatorChar != '\\')
-			path = path.Replace('\\', Path.DirectorySeparatorChar);
-		
-		return path;        
+		// Allocate exactly one new string of the right length and fill it:
+		return string.Create(path.Length, (path, sep), (span, state) =>
+		{
+			var (src, separator) = state;
+			
+			for (var i = 0; i < src.Length; i++)
+			{
+				var c = src[i];
+				
+				span[i] = c is '/' or '\\' ? separator : c;
+			}
+		});
 	}
 	
 	/// <summary>
@@ -1764,7 +1913,6 @@ public static partial class Strings
                 continue;
 
             // enforce preceding char is whitespace or '/'
-            // (user guarantee: it always will be, but we guard anyway)
             if (i > 0 && !(char.IsWhiteSpace(s[i - 1]) || s[i - 1] == '/'))
                 continue;
 
@@ -1790,7 +1938,8 @@ public static partial class Strings
             // optional fractional part if we haven't yet seen a decimal
             if (seenDecimal == false && j < len && s[j] == '.')
             {
-                seenDecimal = true;
+	            // ReSharper disable once RedundantAssignment
+	            seenDecimal = true;
                 j++;
 
                 while (j < len && s[j] >= '0' && s[j] <= '9')
@@ -1920,42 +2069,24 @@ public static partial class Strings
 	#region Time
 
 	/// <summary>
-	/// Format the elapsed time as a more friendly time span with a custom delimiter.
-	/// Like: 3d : 5h : 12m : 15s or 3d+5h+12m+15s
+	/// Formats the elapsed time in the most appropriate unit:
+	/// seconds (s), milliseconds (ms), or microseconds (μs).
 	/// </summary>
-	/// <param name="timer"></param>
-	/// <param name="delimiter">Text to separate time elements; defaults to " : ".</param>
-	/// <returns>Formatted timespan</returns>
-	public static string FormatTimer(this Stopwatch timer, string delimiter = ":")
+	public static string FormatTimer(this Stopwatch timer)
 	{
-		return FormatTimer(TimeSpan.FromMilliseconds(timer.ElapsedMilliseconds), delimiter);
-	}
-	
-	/// <summary>
-	/// Format the elapsed time as a more friendly time span with a custom delimiter.
-	/// Like: 3d : 5h : 12m : 15s or 3d+5h+12m+15s
-	/// </summary>
-	/// <param name="timespan"></param>
-	/// <param name="delimiter">Text to separate time elements; defaults to " : ".</param>
-	/// <returns>Formatted timespan</returns>
-	public static string FormatTimer(this TimeSpan timespan, string delimiter = ":")
-	{
-		var seconds = $"{timespan.TotalSeconds:0.00000000000000000}";
+		var elapsed = timer.Elapsed;
 
-		if (timespan.TotalSeconds < 60)
-			return $"{seconds[..(seconds.IndexOf('.') + 4)]}s";
+		if (elapsed.TotalSeconds >= 1)
+			return $"{elapsed.TotalSeconds:0}s";
 
-		seconds = $"{timespan.Seconds:00.00000000000000000}";
-		
-		if (timespan is { Days: 0, Hours: 0 })
-			return $"{timespan.Minutes:00}m{delimiter}{seconds[..(seconds.IndexOf('.') + 4)]}s";
+		if (elapsed.TotalMilliseconds >= 1)
+			return $"{elapsed.TotalMilliseconds:0}ms";
 
-		if (timespan.Days == 0)
-		{
-			return $"{timespan.Hours:00}h{delimiter}{timespan.Minutes:00}m{delimiter}{seconds[..(seconds.IndexOf('.') + 4)]}s";
-		}
+		// TimeSpan.Ticks are in 100-nanosecond units. 
+		// 1 microsecond = 1,000 nanoseconds = 10 ticks.
+		var microseconds = elapsed.Ticks / 10.0;
 
-		return $"{timespan.Days:00}d{delimiter}{timespan.Hours:00}h{delimiter}{timespan.Minutes:00}m{delimiter}{seconds[..(seconds.IndexOf('.') + 4)]}s";
+		return $"{microseconds:0}μs";
 	}
 	
 	#endregion

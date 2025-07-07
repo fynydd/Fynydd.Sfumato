@@ -1,4 +1,8 @@
-﻿using System.Globalization;
+﻿// ReSharper disable ConvertIfStatementToSwitchStatement
+// ReSharper disable MemberCanBePrivate.Global
+
+using System.Buffers;
+using System.Globalization;
 
 namespace Fynydd.Sfumato.Helpers;
 
@@ -8,59 +12,360 @@ namespace Fynydd.Sfumato.Helpers;
 public static class StringBuilders
 {
 	/// <summary>
+	/// One-liner for replacing the content in a StringBuilder with all or part of a string.
+	/// </summary>
+	/// <param name="sb"></param>
+	/// <param name="content"></param>
+	/// <param name="index"></param>
+	/// <param name="length"></param>
+	/// <returns></returns>
+	public static StringBuilder? ReplaceContent(this StringBuilder? sb, string? content, int index = -1, int length = -1)
+	{
+		if (sb is null)
+			return null;
+
+		sb.Clear();
+
+		if (string.IsNullOrEmpty(content))
+			return sb;
+
+		var contentLen = content.Length;
+
+		// Determine start:
+		var start = index < 0 ? 0 : index;
+		
+		if (start >= contentLen) 
+			return sb; // nothing to append
+
+		var count = length < 0 ? contentLen - start : length;
+
+		if (count <= 0) 
+			return sb; // nothing to append
+
+		if (start + count > contentLen)
+			count = contentLen - start;
+
+		if (start == 0 && count == contentLen)
+			sb.Append(content);
+		else
+			sb.Append(content, start, count);
+
+		return sb;
+	}
+
+	/// <summary>
+	/// One-liner for replacing the content in a StringBuilder with all or part of another StringBuilder.
+	/// </summary>
+	/// <param name="sb"></param>
+	/// <param name="content"></param>
+	/// <param name="index"></param>
+	/// <param name="length"></param>
+	/// <returns></returns>
+	public static StringBuilder? ReplaceContent(this StringBuilder sb, StringBuilder content, int index = -1, int length = -1)
+	{
+		sb.Clear();
+
+		if (index == -1 && length == -1)
+		{
+			sb.Append(content);
+			return sb;
+		}
+
+		var contentLen = content.Length;
+
+		// Determine start:
+		var start = index < 0 ? 0 : index;
+		
+		if (start >= contentLen) 
+			return sb; // nothing to append
+
+		var count = length < 0 ? contentLen - start : length;
+
+		if (count <= 0) 
+			return sb; // nothing to append
+
+		if (start + count > contentLen)
+			count = contentLen - start;
+
+		if (start == 0 && count == contentLen)
+			sb.Append(content);
+		else
+			sb.Append(content, start, count);
+
+		return sb;
+	}
+
+	/// <summary>
+    /// Normalize all “\r\n”, “\r” and “\n” sequences into the specified linebreak,
+    /// modifying the passed-in StringBuilder in place.
+    /// </summary>
+    public static void NormalizeLinebreaks(this StringBuilder? sb, string linebreak = "\n")
+    {
+        if (sb is null || sb.Length == 0)
+            return;
+
+        // First pass: count how many CRLF vs. lone CR or LF we have
+        var len = sb.Length;
+        var countCrlf = 0;
+	    var countSingle = 0;
+
+	    for (var i = 0; i < len; i++)
+        {
+            var c = sb[i];
+            
+            if (c == '\r')
+            {
+                if (i + 1 < len && sb[i + 1] == '\n')
+                {
+                    countCrlf++;
+                    i++; // skip the \n
+                }
+                else
+                {
+                    countSingle++;
+                }
+            }
+            else if (c == '\n')
+            {
+                countSingle++;
+            }
+        }
+
+        // Nothing to normalize?
+        if (countCrlf == 0 && countSingle == 0)
+            return;
+
+        // Compute new total length
+        var brLen = linebreak.Length;
+        var totalTokens = countCrlf + countSingle;
+        var newLen = len
+                     - (countCrlf * 2 + countSingle * 1)
+                     + totalTokens * brLen;
+
+        // Second pass: build into a single char[] buffer
+        var buffer = new char[newLen];
+        var dst = 0;
+        
+        for (var i = 0; i < len; i++)
+        {
+            var c = sb[i];
+            
+            if (c == '\r')
+            {
+                if (i + 1 < len && sb[i + 1] == '\n')
+                {
+                    // CRLF → linebreak
+                    for (var j = 0; j < brLen; j++)
+                        buffer[dst + j] = linebreak[j];
+
+                    dst += brLen;
+                    i++;
+                }
+                else
+                {
+                    // lone CR → linebreak
+                    for (var j = 0; j < brLen; j++)
+                        buffer[dst + j] = linebreak[j];
+
+                    dst += brLen;
+                }
+            }
+            else if (c == '\n')
+            {
+                // lone LF → linebreak
+                for (var j = 0; j < brLen; j++)
+                    buffer[dst + j] = linebreak[j];
+                
+                dst += brLen;
+            }
+            else
+            {
+                buffer[dst++] = c;
+            }
+        }
+
+        // Replace the builder’s contents in one go
+        sb.Clear();
+        sb.Append(buffer, 0, newLen);
+    }
+
+    /// <summary>
+    /// Normalize all ‘/’ and ‘\’ characters in the StringBuilder to the native 
+    /// Path.DirectorySeparatorChar, modifying the builder in-place.
+    /// </summary>
+    /// <param name="sb">The StringBuilder whose contents will be normalized.</param>
+    public static void SetNativePathSeparators(this StringBuilder? sb)
+    {
+	    if (sb is null || sb.Length == 0) 
+		    return;
+
+	    var sep = Path.DirectorySeparatorChar;
+	    var len = sb.Length;
+
+	    for (var i = 0; i < len; i++)
+	    {
+		    var c = sb[i];
+		    
+		    // if it's a slash of either kind, and not already the native sep, replace it
+		    if (c is '/' or '\\' && c != sep)
+		    {
+			    sb[i] = sep;
+		    }
+	    }
+    }
+
+    /// <summary>
+    /// Returns true if the StringBuilder ends with the given character.
+    /// </summary>
+    /// <param name="sb">The StringBuilder to inspect.</param>
+    /// <param name="value">The character to compare to the last character.</param>
+    /// <returns>True if sb is non‐empty and its last character equals value; otherwise false.</returns>
+    public static bool EndsWith(this StringBuilder sb, char value)
+    {
+	    var len = sb.Length;
+	    
+	    if (len == 0)
+		    return false;
+
+	    return sb[len - 1] == value;
+    }
+    
+    /// <summary>
+    /// Returns the index of the last occurrence of a specified character in the StringBuilder,
+    /// or -1 if the character is not found.
+    /// </summary>
+    /// <param name="sb">The StringBuilder to search.</param>
+    /// <param name="value">The character to locate.</param>
+    /// <returns>
+    /// The zero-based index position of value if found; otherwise, –1. 
+    /// </returns>
+    public static int LastIndexOf(this StringBuilder sb, char value)
+    {
+	    for (var i = sb.Length - 1; i >= 0; i--)
+	    {
+		    if (sb[i] == value)
+			    return i;
+	    }
+
+	    return -1;
+    }
+    
+    /// <summary>
+    /// Removes all leading characters in <paramref name="trimChars"/> from the start of the builder.
+    /// </summary>
+    public static void TrimStart(this StringBuilder sb, params char[] trimChars)
+    {
+	    if (trimChars.Length == 0)
+		    return;
+
+	    var len = sb.Length;
+	    var start = 0;
+	    
+	    while (start < len && trimChars.Contains(sb[start]))
+		    start++;
+
+	    if (start > 0)
+		    sb.Remove(0, start);
+    }
+
+    /// <summary>
+    /// Removes all trailing characters in <paramref name="trimChars"/> from the end of the builder.
+    /// </summary>
+    public static void TrimEnd(this StringBuilder sb, params char[] trimChars)
+    {
+	    if (trimChars.Length == 0)
+		    return;
+
+	    var end = sb.Length - 1;
+	    
+	    while (end >= 0 && trimChars.Contains(sb[end]))
+		    end--;
+
+	    // end is now index of last keep-char, so remove everything after it
+	    if (end < sb.Length - 1)
+		    sb.Remove(end + 1, sb.Length - end - 1);
+    }
+
+    /// <summary>
+    /// Removes all leading and trailing characters in <paramref name="trimChars"/>.
+    /// </summary>
+    public static void Trim(this StringBuilder sb, params char[] trimChars)
+    {
+	    sb.TrimStart(trimChars);
+	    sb.TrimEnd(trimChars);
+    }
+    
+	/// <summary>
 	/// Extract a block of CSS by its starting declaration (e.g. "@layer components").
 	/// </summary>
 	/// <param name="sourceCss"></param>
 	/// <param name="cssBlockStart"></param>
 	/// <param name="startIndex"></param>
 	/// <returns></returns>
-	public static (int Start, int Length) ExtractCssBlock(this StringBuilder sourceCss, string cssBlockStart, int startIndex = 0)
+	public static (int Start, int Length) ExtractCssBlock(this StringBuilder? sourceCss, string cssBlockStart, int startIndex = 0)
 	{
 		if (sourceCss is null || sourceCss.Length == 0 || string.IsNullOrEmpty(cssBlockStart))
 			return (-1, 0);
 
-        var blockStart = sourceCss.IndexOf(cssBlockStart, startIndex, StringComparison.Ordinal);
-
-		if (blockStart < 0)
+		// snapshot once
+		var text = sourceCss.ToString();
+		var n = text.Length;
+		
+		if (n == 0 || string.IsNullOrEmpty(cssBlockStart) || startIndex < 0 || startIndex >= n)
 			return (-1, 0);
 
-		// Cache frequently-used values once to reduce property calls.
-		var length      = sourceCss.Length;
-		var selectorEnd = blockStart + cssBlockStart.Length;
+		// find the selector
+		var blockStart = text.IndexOf(cssBlockStart, startIndex, StringComparison.Ordinal);
+		
+		if (blockStart < 0) 
+			return (-1, 0);
 
-		var depth = 0;
-		var i     = selectorEnd;
+		var span = text.AsSpan();
+		var pos = blockStart + cssBlockStart.Length;
 
-		// Skip whitespace between the selector and its first “{”.
-		for (; i < length; i++)
+		// skip ASCII whitespace until the brace
+		while (pos < n)
 		{
-			var ch = sourceCss[i];
-
-			if (ch == '{')
+			var c = span[pos];
+			
+			if (c == '{')
 			{
-				depth = 1;             // we just entered the block
-				i++;                   // start scanning inside it
+				pos++;    // enter block
 				break;
 			}
-
-			if (char.IsWhiteSpace(ch) == false)
-				return (-1, 0);   // malformed selector (no opening brace)
+			
+			// ASCII whitespace: space, tab, LF, CR, FF, VT
+			if (c > ' ' || (c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\f' && c != '\v'))
+				return (-1, 0);  // malformed: non-space before brace
+			
+			pos++;
 		}
 
-		if (depth == 0)
-			return (-1, 0);   // never saw a “{”
+		if (pos >= n) 
+			return (-1, 0);
 
-		for (; i < length; i++)
+		// scan the block for matching braces
+		var depth = 1;
+		var i     = pos;
+		
+		for (; i < n; i++)
 		{
-			var ch = sourceCss[i];
+			var c = span[i];
 
-			if (ch == '{')
+			if (c == '{')
+			{
 				depth++;
-			else if (ch == '}' && --depth == 0)
-				return (blockStart, i - blockStart + 1);
+			}
+			else if (c == '}')
+			{
+				depth--;
+
+				if (depth == 0)
+					return (blockStart, i - blockStart + 1); // found matching '}' for our initial '{'
+			}
 		}
 
-		// Unterminated block ⇒ give up.
+		// unterminated
 		return (-1, 0);
 	}
 
@@ -71,7 +376,7 @@ public static class StringBuilders
 	/// <param name="value"></param>
 	/// <param name="startIndex"></param>
 	/// <returns></returns>
-	public static int IndexOf(this StringBuilder? sb, char value, int startIndex = 0)
+	public static int IndexOf(this StringBuilder? sb, char value, int startIndex)
 	{
 		if (sb == null || startIndex < 0 || startIndex >= sb.Length)
 			return -1;
@@ -109,177 +414,235 @@ public static class StringBuilders
 		return -1;
 	}
 	
+	private const int MaxSpaces = 4096;
+	private static readonly char[] SpacesBuffer = CreateSpaceBuffer();
+	private static char[] CreateSpaceBuffer()
+	{
+		var buf = new char[MaxSpaces];
+
+		for (var i = 0; i < MaxSpaces; i++)
+			buf[i] = ' ';
+		
+		return buf;
+	}
+	
 	/// <summary>
 	/// Reformats the CSS in this StringBuilder so that each block is indented
 	/// by <paramref name="indentSize"/> spaces per nesting level.
-	/// Also, properly indents /* … */ comments (both standalone and inline).
+	/// Also removes comments.
 	/// </summary>
 	/// <param name="source">The StringBuilder containing the CSS to reformat.</param>
-	/// <param name="workingSb">Working StringBuilder instance (will be cleared).</param>
 	/// <param name="indentSize">Number of spaces per indentation level (default: 4).</param>
 	/// <returns>The same StringBuilder, now cleared and repopulated with formatted CSS.</returns>
-	public static StringBuilder ReformatCss(this StringBuilder source, StringBuilder workingSb, int indentSize = 4)
-	{
-	    var css = source.ToString();
-	    var depth = 0;
-	    var inString = false;
-	    var stringDelimiter = '\0';
-	    var inComment = false;
+    public static StringBuilder ReformatCss(this StringBuilder source, int indentSize = 4)
+    {
+        // 1) Read input and rent pooled buffer
+        var css = source.ToString();
+        var inLen = css.Length;
+        var bufLen = inLen + (inLen >> 2) + 128;
+        var buf = ArrayPool<char>.Shared.Rent(bufLen);
+        var outIdx = 0;
 
-	    for (var i = 0; i < css.Length; i++)
-	    {
-	        var c    = css[i];
-	        var next = i + 1 < css.Length ? css[i + 1] : '\0';
+        // 2) State
+        var depth = 0;
+        var inString = false;
+        var stringDelim = '\0';
 
-	        // Enter comment?
-	        if (inString == false && inComment == false && c == '/' && next == '*')
-	        {
-	            var atLineStart = workingSb.Length == 0 || workingSb[^1] == '\n';
+        // 3) Blank-line suppression & line-start tracking
+        var lineStartIdx = 0;
+        var anyContentInLine = false;
 
-	            if (atLineStart)
+        // 4) One-pass formatting
+        for (var i = 0; i < inLen; i++)
+        {
+            var c = css[i];
+            var next = (i + 1 < inLen) ? css[i + 1] : '\0';
+
+            // — skip /*…*/ entirely
+            if (inString == false && c == '/' && next == '*')
+            {
+                i += 2;
+
+                while (i + 1 < inLen && (css[i] == '*' && css[i + 1] == '/') == false)
+                    i++;
+                
+                if (i + 1 < inLen)
+                    i++;
+                
+                continue;
+            }
+
+            // — skip //… to the end of line
+            if (inString == false && c == '/' && next == '/')
+            {
+                i += 2;
+                
+                while (i < inLen && css[i] != '\n')
+                    i++;
+                
+                if (i < inLen && css[i] == '\n')
+                    WriteNewline();
+                
+                continue;
+            }
+
+            // — toggle into string literal
+            if (inString == false && c is '"' or '\'')
+            {
+                if (outIdx == lineStartIdx)
+                {
+                    AppendIndent();
+                }
+
+                inString = true;
+                stringDelim = c;
+                buf[outIdx++] = c;
+                anyContentInLine = true;
+                
+                continue;
+            }
+
+            // — toggle out of string
+            if (inString && c == stringDelim)
+            {
+                buf[outIdx++] = c;
+                anyContentInLine = true;
+                inString = false;
+                
+                continue;
+            }
+
+            // — inside string, copy verbatim
+            if (inString)
+            {
+                buf[outIdx++] = c;
+                anyContentInLine = true;
+                
+                continue;
+            }
+
+            // — outside strings and comments: handle CSS syntax
+            switch (c)
+            {
+                case '{':
+                
+	                if (outIdx == lineStartIdx)
+                    {
+                        AppendIndent();
+                    }
+                    
+	                buf[outIdx++] = '{';
+                    anyContentInLine = true;
+                    
+	                WriteNewline();
+                    
+	                depth++;
+                    
+	                break;
+
+                case '}':
+                    
+	                WriteNewline();
+                    
+	                depth = Math.Max(0, depth - 1);
+                    
 	                AppendIndent();
-	            else
-	                workingSb.Append(' ');
+                    
+	                buf[outIdx++] = '}';
+                    anyContentInLine = true;
+                    
+	                WriteNewline();
+                    
+	                break;
 
-	            workingSb.Append("/*");
-	            inComment = true;
-	            i++; // consume '*'
-	            
-	            continue;
-	        }
+                case ';':
+                    
+	                if (outIdx == lineStartIdx)
+                    {
+                        AppendIndent();
+                    }
+                    
+	                buf[outIdx++] = ';';
+                    anyContentInLine = true;
+                    
+	                WriteNewline();
+                    
+	                break;
 
-	        // Inside comment: copy until "*/", indent newlines
-	        if (inComment)
-	        {
-		        // ReSharper disable once ConvertIfStatementToSwitchStatement
-		        if (c == '*' && next == '/')
-	            {
-	                workingSb.Append("*/");
-	                inComment = false;
-	                i++; // consume '/'
-	                workingSb.AppendLine();
-	                AppendIndent();
-	            }
-	            else if (c == '\n')
-	            {
-	                workingSb.AppendLine();
-	                AppendIndent();
-	            }
-	            else if (c != '\r')
-	            {
-	                workingSb.Append(c);
-	            }
+                case '\n':
+                    
+	                WriteNewline();
+                    
+	                break;
 
-		        continue;
-	        }
+                default:
+                    if (IsAsciiWhite(c) == false)
+                    {
+                        if (outIdx == lineStartIdx)
+                        {
+                            AppendIndent();
+                        }
+                    
+                        buf[outIdx++] = c;
+                        anyContentInLine = true;
+                    }
+                    else
+                    {
+                        // collapse runs of ASCII whitespace
+                        if (outIdx > 0 && buf[outIdx - 1] != ' ' && buf[outIdx - 1] != '\n')
+                            buf[outIdx++] = ' ';
+                    }
+                    break;
+            }
+        }
 
-	        // Toggle string state
-	        // ReSharper disable once ConvertIfStatementToSwitchStatement
-	        if (inString == false && c is '"' or '\'')
-	        {
-	            inString = true;
-	            stringDelimiter = c;
-	            workingSb.Append(c);
+        // 5) Final newline if needed
+        if (anyContentInLine)
+            buf[outIdx++] = '\n';
 
-	            continue;
-	        }
-	        
-	        if (inString && c == stringDelimiter)
-	        {
-	            inString = false;
-	            workingSb.Append(c);
-	            
-	            continue;
-	        }
-	        
-	        if (inString == false)
-	        {
-	            // Outside strings: handle braces and semicolons
-	            switch (c)
-	            {
-	                case '{':
-	                    workingSb.Append(c);
-	                    workingSb.AppendLine();
-	                    depth++;
-	                    AppendIndent();
-	                    break;
+        // 6) Flush back into source
+        source.Clear();
+        source.EnsureCapacity(outIdx);
+        source.Append(buf, 0, outIdx);
 
-	                case '}':
-	                    workingSb.AppendLine();
-	                    depth = Math.Max(0, depth - 1);
-	                    AppendIndent();
-	                    workingSb.Append(c);
-	                    workingSb.AppendLine();
-	                    AppendIndent();
-	                    break;
+        // 7) Return pooled buffer
+        ArrayPool<char>.Shared.Return(buf);
 
-	                case ';':
-	                    workingSb.Append(c);
-	                    var hasInlineComment = false;
-	                    for (var j = i + 1; j < css.Length; j++)
-	                    {
-	                        if (char.IsWhiteSpace(css[j]))
-	                        {
-	                            continue;
-	                        }
-	                        if (css[j] == '/' && j + 1 < css.Length && css[j + 1] == '*')
-	                        {
-	                            hasInlineComment = true;
-	                        }
-	                        break;
-	                    }
-	                    if (hasInlineComment)
-	                    {
-	                        workingSb.Append(' ');
-	                    }
-	                    else
-	                    {
-	                        workingSb.AppendLine();
-	                        AppendIndent();
-	                    }
-	                    break;
+        return source;
 
-	                default:
-	                    if (char.IsWhiteSpace(c))
-	                    {
-	                        if (workingSb.Length > 0 && !char.IsWhiteSpace(workingSb[^1]))
-	                        {
-	                            workingSb.Append(' ');
-	                        }
-	                    }
-	                    else
-	                    {
-	                        workingSb.Append(c);
-	                    }
-	                    break;
-	            }
-	            
-	            continue;
-	        }
+        // Fast ASCII whitespace check
+        static bool IsAsciiWhite(char c) => c is ' ' or '\t' or '\r';
 
-	        // Inside string: copy verbatim
-	        workingSb.Append(c);
-	    }
+        // Indent via block-copy
+        void AppendIndent()
+        {
+            var total = depth * indentSize;
 
-	    // Remove blank or whitespace‑only lines
-	    var lines = workingSb
-		    .ToString()
-		    .Split(["\r\n", "\n"], StringSplitOptions.None);
+            if (total > MaxSpaces)
+                total = MaxSpaces;
+            
+            Array.Copy(SpacesBuffer, 0, buf, outIdx, total);
+            
+            outIdx += total;
+            // still atLineStart until we emit a non-space
+        }
 
-	    workingSb.Clear();
-
-	    foreach (var line in lines)
-	    {
-		    if (line.Trim().Length > 0)
-			    workingSb.AppendLine(line);
-	    }
-	    
-	    source.Clear();
-
-	    return source.Append(workingSb);
-
-	    void AppendIndent() => workingSb.Append(new string(' ', depth * indentSize));
-	}
+        void WriteNewline()
+        {
+            if (anyContentInLine)
+            {
+                buf[outIdx++] = '\n';
+                lineStartIdx = outIdx;
+            }
+            else
+            {
+                // drop whitespace-only line
+                outIdx = lineStartIdx;
+            }
+            
+            anyContentInLine = false;
+        }
+    }
 	
 	public static byte[] ToByteArray(this StringBuilder sb, Encoding encoding)
 	{
@@ -587,29 +950,8 @@ public static class StringBuilders
 		return false;
 	}
 	
-	/// <summary>
-	/// Normalize line breaks in a StringBuilder
-	/// </summary>
-	/// <param name="source"></param>
-	/// <param name="linebreak">Line break to use (default: "\n")</param>
-	public static void NormalizeLinebreaks(this StringBuilder source, string? linebreak = "\n")
-	{
-		if (source.IsEmpty()) return;
-
-		if (linebreak == null || linebreak.IsEmpty()) return;
-        
-		if (source.Contains("\r\n") && linebreak != "\r\n")
-			source.Replace("\r\n", linebreak);
-
-		else if (source.Contains('\r') && linebreak != "\r")
-			source.Replace("\r", linebreak);
-
-		else if (source.Contains('\n') && linebreak != "\n")
-			source.Replace("\n", linebreak);
-	}
-	
     /// <summary>
-    /// Enumerates every occurrence of token that is
+    /// Enumerates every occurrence of a token that is
     /// immediately followed (optionally after whitespace) by a balanced
     /// parenthetical expression.
     /// Each yielded string consists of the token plus the complete outer
@@ -620,77 +962,60 @@ public static class StringBuilders
     /// <returns>IEnumerable&lt;string&gt; of matches, streamed as they are found.</returns>
     public static IEnumerable<string> EnumerateTokenWithOuterParenthetical(this StringBuilder sb, string token)
     {
-        if (string.IsNullOrEmpty(token))
-            throw new ArgumentException("Token must be non-empty.", nameof(token));
+	    if (sb is null)
+		    throw new ArgumentNullException(nameof(sb));
+	    
+	    if (string.IsNullOrEmpty(token))
+		    throw new ArgumentException("Token must be non-empty.", nameof(token));
 
-        var length = sb.Length;
-        var tokenLen = token.Length;
-        var t0 = token[0]; // first char for quick scan
+	    // 1) Snapshot to a single string for fast indexing + IndexOf
+	    var text = sb.ToString();
+	    var length = text.Length;
+	    var tokenLen = token.Length;
+	    var pos = 0;
 
-        for (var i = 0; i <= length - tokenLen; i++)
-        {
-            // 1. Quick-fail: first character must match
-            if (sb[i] != t0)
-	            continue;
+	    // 2) Find each occurrence of `token`
+	    while ((pos = text.IndexOf(token, pos, StringComparison.Ordinal)) != -1)
+	    {
+		    // 3) Skip any whitespace after the token
+		    var p = pos + tokenLen;
 
-            // 2. Check the rest of the token
-            var match = true;
-            
-            for (var k = 1; k < tokenLen; k++)
-            {
-                if (sb[i + k] != token[k])
-                {
-                    match = false;
-                    break;
-                }
-            }
-            
-            if (match == false)
-	            continue;
+		    while (p < length && char.IsWhiteSpace(text[p]))
+			    p++;
 
-            // 3. Skip whitespace after the token
-            var p = i + tokenLen;
-            
-            while (p < length && char.IsWhiteSpace(sb[p]))
-	            p++;
+		    // 4) Must be an opening '('
+		    if (p >= length || text[p] != '(')
+		    {
+			    pos += tokenLen; // jump past this token
+			    continue;
+		    }
 
-            // 4. Must see an opening parenthesis
-            if (p >= length || sb[p] != '(')
-	            continue;
+		    // 5) Balanced-parenthesis scan
+		    var depth = 1;
+		    var j = p + 1;
 
-            // 5. Walk forward, tracking depth to find the matching ')' for the *outer* '('
-            var depth = 0;
-            var j = p;
-            
-            while (j < length)
-            {
-                var c = sb[j];
-                
-                if (c == '(')
-                {
-                    depth++;
-                }
-                else if (c == ')')
-                {
-                    depth--;
-                
-                    if (depth == 0)
-                    {
-                        // Found the balancing ')' – emit the slice
-                        yield return sb.ToString(i, j - i + 1);
+		    while (j < length && depth > 0)
+		    {
+			    switch (text[j++])
+			    {
+				    case '(': depth++; break;
+				    case ')': depth--; break;
+			    }
+		    }
 
-                        // Advance i so we don’t rescan inside the just-matched span
-                        i = j;
-                    
-                        break;
-                    }
-                }
+		    if (depth == 0)
+		    {
+			    // 6) We found the matching ')'
+			    yield return text.Substring(pos, j - pos);
 
-                j++;
-            }
-
-            // If the loop exits without depth hitting zero, parentheses were unbalanced;
-            // we simply fall through and continue searching (no match yielded).
-        }
+			    // 7) Advance `pos` so we don't re‐scan inside this match
+			    pos = j;
+		    }
+		    else
+		    {
+			    // unbalanced → no more valid matches
+			    yield break;
+		    }
+	    }
     }
 }

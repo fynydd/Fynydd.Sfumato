@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace Fynydd.Sfumato.Entities.CssClassProcessing;
 
 public static class DelimitedSplitExtensions

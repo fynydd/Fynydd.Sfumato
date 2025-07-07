@@ -1,4 +1,4 @@
-using System.Reflection;
+// ReSharper disable MemberCanBePrivate.Global
 
 namespace Fynydd.Sfumato.Entities.Runners;
 
@@ -16,10 +16,10 @@ public sealed class AppRunner
 	
 	public AppState AppState { get; }
 	public Library.Library Library { get; set; } = new();
-	public AppRunnerSettings AppRunnerSettings { get; set; } = new(null);
+	public AppRunnerSettings AppRunnerSettings { get; set; } = new();
 	public ConcurrentDictionary<string,ScannedFile> ScannedFiles { get; } = new(StringComparer.Ordinal);
-	public ConcurrentDictionary<string,string> UsedCssCustomProperties { get; } = new(StringComparer.Ordinal);
-	public ConcurrentDictionary<string,string> UsedCss { get; } = new(StringComparer.Ordinal);
+	public Dictionary<string,string> UsedCssCustomProperties { get; } = new(StringComparer.Ordinal);
+	public Dictionary<string,string> UsedCss { get; } = new(StringComparer.Ordinal);
 	public Dictionary<string,CssClass> UtilityClasses { get; } = new(StringComparer.Ordinal);
 
 	private string _cssFilePath;
@@ -29,13 +29,25 @@ public sealed class AppRunner
 	private ConcurrentDictionary<long, FileSystemEventArgs> RestartAppQueue { get; } = [];
 	private ConcurrentDictionary<long, FileSystemEventArgs> RebuildProjectQueue { get; } = [];
 
+	#region CSS Generation Data
+
+	public StringBuilder CssContentWithoutSettings { get; } = new();
+	public StringBuilder CombinedSegmentCss { get; } = new();
+	
+	public GenerationSegment DefaultsCssSegment { get; } = new();
+	public GenerationSegment BrowserResetCssSegment { get; } = new();
+	public GenerationSegment FormsCssSegment { get; } = new();
+
+	public GenerationSegment ImportsCssSegment { get; } = new();
+	public GenerationSegment SfumatoSegment { get; } = new();
+	public GenerationSegment ComponentsCssSegment { get; } = new();
+	public GenerationSegment CustomCssSegment { get; } = new();
+	public GenerationSegment UtilitiesCssSegment { get; } = new();
+	public GenerationSegment ThemeCssSegment { get; } = new();
+	public GenerationSegment PropertiesCssSegment { get; } = new();
+	public GenerationSegment PropertyListCssSegment { get; } = new();
+	
 	#endregion
-
-	#region Cached data
-
-	public string BrowserResetCss { get; set; } = string.Empty;
-	public string FormsCss { get; set; } = string.Empty;
-	public string DefaultsCss { get; set; } = string.Empty;
 
 	#endregion
 
@@ -48,16 +60,16 @@ public sealed class AppRunner
 		_cssFilePath = cssFilePath;
 		_useMinify = useMinify;
 
-		BrowserResetCss = File.ReadAllText(Path.Combine(AppState.EmbeddedCssPath, "browser-reset.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim();
-		FormsCss = File.ReadAllText(Path.Combine(AppState.EmbeddedCssPath, "forms.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim();
-		DefaultsCss = File.ReadAllText(Path.Combine(AppState.EmbeddedCssPath, "defaults.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim();
+		BrowserResetCssSegment.Content = new StringBuilder(File.ReadAllText(Path.Combine(AppState.EmbeddedCssPath, "browser-reset.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim());
+		FormsCssSegment.Content = new StringBuilder(File.ReadAllText(Path.Combine(AppState.EmbeddedCssPath, "forms.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim());
+		DefaultsCssSegment.Content = new StringBuilder(File.ReadAllText(Path.Combine(AppState.EmbeddedCssPath, "defaults.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim());
 
 		Initialize();
 	}
 
     #endregion
     
-    #region Process Settings
+    #region Initialize
 
     /// <summary>
     /// Clears AppRunnerSettings and loads default settings from defaults.css.
@@ -68,364 +80,42 @@ public sealed class AppRunner
 	    {
 		    Library = new Library.Library();
 		    
-		    AppRunnerSettings = new AppRunnerSettings(this)
+		    AppRunnerSettings = new AppRunnerSettings()
 		    {
 			    CssFilePath = _cssFilePath,
 			    UseMinify = _useMinify
 		    };
 
-		    AppRunnerSettings.ExtractSfumatoItems(DefaultsCss);
+		    DefaultsCssSegment.Content.ExtractSfumatoBlock(this);
+		    AppRunnerExtensions.ImportSfumatoBlockSettingsItems(this);
 
-		    ProcessCssSettings();
+		    if (AppRunnerExtensions.ProcessSfumatoBlockSettings(this, true) == false)
+			    throw new Exception("Could not process the Sfumato settings");
 	    }
 	    catch (Exception e)
 	    {
-		    Messages.Add($"{AppState.CliErrorPrefix}Initialize() - {e.Message}");
+		    Messages.Add(e.Message);
 	    }
-    }
-
-    /// <summary>
-    /// Loads the CSS file, imports partials, extracts the Sfumato settings block, and processes it.
-    /// </summary>
-    public async Task LoadCssFileAsync()
-    {
-	    try
-	    {
-		    AppRunnerSettings.LoadCssAndExtractSfumatoBlock(); // Extract Sfumato settings and CSS content
-		    AppRunnerSettings.ExtractSfumatoItems(); // Parse all the Sfumato settings into a Dictionary<string,string>()
-		    AppRunnerSettings.ProcessProjectSettings(); // Read project/operation settings
-		    AppRunnerSettings.ImportPartials(); // Read in all CSS partial files (@import "...")
-
-		    ProcessCssSettings();
-	    }
-	    catch (Exception e)
-	    {
-		    Messages.Add($"{AppState.CliErrorPrefix}LoadCssFileAsync() - {e.Message}");
-	    }
-	    
-	    await Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Processes CSS settings for colors, breakpoints, etc., and uses reflection to load all others per utility class file.  
-    /// </summary>
-    public void ProcessCssSettings()
-    {
-	    #region Read color definitions
-	    
-	    foreach (var match in AppRunnerSettings.SfumatoBlockItems.Where(i => i.Key.StartsWith("--color-")))
-	    {
-		    var key = match.Key.TrimStart("--color-") ?? string.Empty;
-
-		    if (string.IsNullOrEmpty(key))
-			    continue;
-
-		    if (Library.ColorsByName.TryAdd(key, match.Value) == false)
-			    Library.ColorsByName[key] = match.Value;
-	    }
-	    
-	    #endregion
-
-	    #region Read breakpoints
-
-	    var prefixOrder = 100;
-
-	    foreach (var match in AppRunnerSettings.SfumatoBlockItems)
-	    {
-		    if (match.Key.StartsWith("--breakpoint-") == false)
-			    continue;
-		    
-		    var key = match.Key.TrimStart("--breakpoint-") ?? string.Empty;
-
-		    if (string.IsNullOrEmpty(key))
-			    continue;
-
-		    if (Library.MediaQueryPrefixes.TryAdd(key, new VariantMetadata
-		        {
-			        PrefixOrder = prefixOrder,
-			        PrefixType = "media",
-			        Statement = $"(width >= {match.Value})"
-		        }) == false)
-		    {
-			    Library.MediaQueryPrefixes[key] = new VariantMetadata
-			    {
-				    PrefixOrder = prefixOrder,
-				    PrefixType = "media",
-				    Statement = $"(width >= {match.Value})"
-			    };
-		    }
-
-		    if (prefixOrder < int.MaxValue - 100)
-			    prefixOrder += 100;
-
-		    if (Library.MediaQueryPrefixes.TryAdd($"max-{key}", new VariantMetadata
-		        {
-			        PrefixOrder = prefixOrder,
-			        PrefixType = "media",
-			        Statement = $"(width < {match.Value})"
-		        }) == false)
-		    {
-			    Library.MediaQueryPrefixes[$"max-{key}"] = new VariantMetadata
-			    {
-				    PrefixOrder = prefixOrder,
-				    PrefixType = "media",
-				    Statement = $"(width < {match.Value})"
-			    };
-		    }
-		    
-		    if (prefixOrder < int.MaxValue - 100)
-			    prefixOrder += 100;
-	    }
-	    
-	    foreach (var breakpoint in AppRunnerSettings.SfumatoBlockItems)
-	    {
-		    if (breakpoint.Key.StartsWith("--adaptive-breakpoint-") == false)
-			    continue;
-
-		    var key = breakpoint.Key.TrimStart("--adaptive-breakpoint-") ?? string.Empty;
-
-		    if (string.IsNullOrEmpty(key))
-			    continue;
-
-		    if (double.TryParse(breakpoint.Value, out var maxValue) == false)
-			    continue;
-
-		    if (Library.MediaQueryPrefixes.TryAdd(key, new VariantMetadata
-		        {
-			        PrefixOrder = prefixOrder,
-			        PrefixType = "media",
-			        Statement = $"(min-aspect-ratio: {breakpoint.Value})"
-		        }) == false)
-		    {
-			    Library.MediaQueryPrefixes[key] = new VariantMetadata
-			    {
-				    PrefixOrder = prefixOrder,
-				    PrefixType = "media",
-				    Statement = $"(min-aspect-ratio: {breakpoint.Value})"
-			    };
-		    }
-		    
-		    if (prefixOrder < int.MaxValue - 100)
-			    prefixOrder += 100;
-
-		    if (Library.MediaQueryPrefixes.TryAdd($"max-{key}", new VariantMetadata
-		        {
-			        PrefixOrder = prefixOrder,
-			        PrefixType = "media",
-			        Statement = $"(max-aspect-ratio: {maxValue - 0.0001})"
-		        }) == false)
-		    {
-			    Library.MediaQueryPrefixes[$"max-{key}"] = new VariantMetadata
-			    {
-				    PrefixOrder = prefixOrder,
-				    PrefixType = "media",
-				    Statement = $"(max-aspect-ratio: {maxValue - 0.0001})"
-			    };
-		    }
-		    
-		    if (prefixOrder < int.MaxValue - 100)
-			    prefixOrder += 100;
-	    }
-
-	    foreach (var breakpoint in AppRunnerSettings.SfumatoBlockItems.Where(i => i.Key.StartsWith("--container-")))
-	    {
-		    var key = breakpoint.Key.TrimStart("--container-") ?? string.Empty;
-
-		    if (string.IsNullOrEmpty(key))
-			    continue;
-
-		    if (Library.ContainerQueryPrefixes.TryAdd($"@{key}", new VariantMetadata
-		        {
-			        PrefixOrder = prefixOrder,
-			        PrefixType = "container",
-			        Statement = $"(width >= {breakpoint.Value})"
-		        }) == false)
-		    {
-			    Library.ContainerQueryPrefixes[$"@{key}"] = new VariantMetadata
-			    {
-				    PrefixOrder = prefixOrder,
-				    PrefixType = "container",
-				    Statement = $"(width >= {breakpoint.Value})"
-			    };
-		    }
-
-		    if (prefixOrder < int.MaxValue - 100)
-			    prefixOrder += 100;
-
-		    if (Library.ContainerQueryPrefixes.TryAdd($"@max-{key}", new VariantMetadata
-		        {
-			        PrefixOrder = prefixOrder,
-			        PrefixType = "container",
-			        Statement = $"(width < {breakpoint.Value})"
-		        }) == false)
-		    {
-			    Library.ContainerQueryPrefixes[$"@max-{key}"] = new VariantMetadata
-			    {
-				    PrefixOrder = prefixOrder,
-				    PrefixType = "container",
-				    Statement = $"(width < {breakpoint.Value})"
-			    };
-		    }
-		    
-		    if (prefixOrder < int.MaxValue - 100)
-			    prefixOrder += 100;
-	    }
-
-	    #endregion
-	    
-	    #region Read @custom-variant shorthand items
-
-	    foreach (var match in AppRunnerSettings.SfumatoBlockItems)
-	    {
-		    if (match.Key.StartsWith("@custom-variant") == false)
-			    continue;
-
-		    if (match.Value.StartsWith("&:", StringComparison.Ordinal) == false && match.Value.StartsWith('@') == false)
-			    continue;
-
-		    var keySegments = match.Key.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			    
-		    if (keySegments.Length < 2)
-			    continue;
-
-		    var key = keySegments[1];
-
-		    if (match.Value.StartsWith("&:"))
-		    {
-			    if (Library.PseudoclassPrefixes.TryAdd(key, new VariantMetadata
-			        {
-				        PrefixType = "pseudoclass",
-				        SelectorSuffix = $"{match.Value.TrimStart('&')}"
-			        }) == false)
-			    {
-				    Library.PseudoclassPrefixes[key] = new VariantMetadata
-				    {
-					    PrefixType = "pseudoclass",
-					    SelectorSuffix = $"{match.Value.TrimStart('&')}"
-				    };
-			    }
-
-			    Library.MediaQueryPrefixes.Remove(key);
-		    }
-		    else
-		    {
-			    if (string.IsNullOrEmpty(key))
-				    continue;
-
-			    var wrapperSegments = match.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			    
-			    if (wrapperSegments.Length < 2)
-				    continue;
-
-			    var prefixType = wrapperSegments[0].TrimStart('@').TrimStart('&');
-
-			    if (string.IsNullOrEmpty(prefixType))
-				    continue;
-
-			    var statement = $"{match.Value.TrimStart($"@{prefixType}")?.Trim()}";
-			    
-			    if (prefixType.Equals("media", StringComparison.OrdinalIgnoreCase))
-			    {
-				    if (Library.MediaQueryPrefixes.TryAdd(key, new VariantMetadata
-				        {
-					        PrefixOrder = prefixOrder,
-					        PrefixType = prefixType,
-					        Statement = statement
-				        }) == false)
-				    {
-					    Library.MediaQueryPrefixes[key] = new VariantMetadata
-					    {
-						    PrefixOrder = prefixOrder,
-						    PrefixType = prefixType,
-						    Statement = statement
-					    };
-				    }
-
-				    if (prefixOrder < int.MaxValue - 100)
-					    prefixOrder += 100;
-				    
-				    Library.PseudoclassPrefixes.Remove(key);
-			    }
-			    else if (prefixType.Equals("supports", StringComparison.OrdinalIgnoreCase))
-			    {
-				    if (Library.SupportsQueryPrefixes.TryAdd(key, new VariantMetadata
-				        {
-					        PrefixOrder = Library.SupportsQueryPrefixes.Count + 1,
-					        PrefixType = prefixType,
-					        Statement = statement
-				        }) == false)
-				    {
-					    Library.SupportsQueryPrefixes[key] = new VariantMetadata
-					    {
-						    PrefixOrder = Library.SupportsQueryPrefixes.Count + 1,
-						    PrefixType = prefixType,
-						    Statement = statement
-					    };
-				    }
-				    
-				    Library.PseudoclassPrefixes.Remove(key);
-			    }
-		    }
-	    }
-	    
-	    #endregion
-	    
-		#region Read @utility items
-
-		foreach (var match in AppRunnerSettings.SfumatoBlockItems)
-		{
-			if (match.Key.StartsWith("@utility") == false)
-				continue;
-
-			var segments = match.Key.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-			if (segments.Length != 2)
-				continue;
-
-			if (Library.SimpleClasses.TryAdd(segments[1], new ClassDefinition
-			{
-				InSimpleUtilityCollection = true,
-				Template = match.Value.Trim().TrimStart('{').TrimEnd('}').Trim()
-			}))
-			{
-				Library.ScannerClassNamePrefixes.Insert(segments[1]);
-			}
-		}
-
-	    #endregion
-	    
-		#region Read theme settings from ClassDictionary instances (e.g. --text-xs, etc.)
-	    
-	    var derivedTypes = Assembly.GetExecutingAssembly()
-		    .GetTypes()
-		    .Where(t => typeof(ClassDictionaryBase).IsAssignableFrom(t) && t is { IsClass: true, IsAbstract: false });
-
-		foreach (var type in derivedTypes)
-		{
-			if (Activator.CreateInstance(type) is not ClassDictionaryBase instance)
-				continue;
-
-			instance.ProcessThemeSettings(this);
-	    }
-	    
-	    #endregion
     }
 
 	#endregion
 
 	#region Messaging
 
+	public string CreatePathMessage(string prefix, string path)
+	{
+		var maxWidth = Library.GetMaxConsoleWidth() - prefix.Length - 3;
+		var relativePath = path.TruncateCenter((int)Math.Floor(maxWidth / 3d), (int)Math.Floor((maxWidth / 3d) * 2) - 3, maxWidth);
+
+		return $"{prefix} : {relativePath}";
+	}
+	
 	public async Task AddCssPathMessageAsync()
 	{
 		while (MessagesBusy)
 			await Task.Delay(25);
 		
-		var relativePath = Path.GetFullPath(AppRunnerSettings.CssFilePath).TruncateCenter(
-			(int)Math.Floor(Entities.Library.Library.MaxConsoleWidth / 3d),
-			(int)Math.Floor((Entities.Library.Library.MaxConsoleWidth / 3d) * 2) - 3,
-			Entities.Library.Library.MaxConsoleWidth);
-
-		Messages.Add(relativePath);
+		Messages.Add(CreatePathMessage("Changed", Path.GetFullPath(AppRunnerSettings.CssFilePath)));
 	}
 
 	private async Task AddMessageAsync(string message)
@@ -461,146 +151,119 @@ public sealed class AppRunner
 	
 	#region File Scanning
 	
-	public async Task ReInitializeAsync()
+	public async Task<bool> ReInitializeAsync()
 	{
 		Initialize();
-		await LoadCssFileAsync();
+		
+		return await this.LoadCssFileAsync();
 	}
 
 	public async Task PerformFileScanAsync()
 	{
-		var tasks = new ConcurrentBag<Task>();
-
 		ScannedFiles.Clear();
 		FileScanStopwatch.Restart();
 
-		foreach (var path in AppRunnerSettings.AbsolutePaths)
-			tasks.Add(RecurseProjectPathAsync(path, tasks));
+		// 1. Grab EVERYTHING in one streaming pass
+		var allPaths = AppRunnerSettings.AbsolutePaths
+			.SelectMany(root => 
+				Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
+					.Where(PassesPathFilters)
+			);
 
-		await Task.WhenAll(tasks);
-		
+		// 2. Kick off the scans in parallel—but limit to CPU cores to avoid starvation
+		//    We wrap each scan in Task.Run so we can await the batch as a true async call.
+		var scanTasks = allPaths
+			.Select(path => Task.Run(async () => await ProcessSingleFileAsync(path)));
+
+		await Task.WhenAll(scanTasks);
+
+		// 3. Re-aggregate the utility-class map
 		ProcessScannedFileUtilityClassDependencies(this);
-		
+
 		FileScanStopwatch.Stop();
-		
-		await AddMessageAsync($"Found {ScannedFiles.Count:N0} file{(ScannedFiles.Count == 1 ? string.Empty : "s")}, {UtilityClasses.Count:N0} class{(UtilityClasses.Count == 1 ? string.Empty : "es")} in {FileScanStopwatch.FormatTimer()}");
+
+		await AddMessageAsync(
+			$"Found {ScannedFiles.Count:N0} file{(ScannedFiles.Count==1?"":"s")}, " +
+			$"{UtilityClasses.Count:N0} class{(UtilityClasses.Count==1?"":"es")} in {FileScanStopwatch.FormatTimer()}"
+		);
 	}
 
-	private async Task RecurseProjectPathAsync(string? sourcePath, ConcurrentBag<Task> tasks)
+	private bool PassesPathFilters(string fullName)
 	{
-		if (string.IsNullOrEmpty(sourcePath))
-			return;
+		// drop blacklisted extensions
+		var ext = Path.GetExtension(fullName);
 
-		string path;
-
-		try
-		{
-			path = Path.GetFullPath(sourcePath);
-		}
-		catch
-		{
-			Messages.Add($"{Strings.TriangleRight} WARNING: Source directory could not be found: {sourcePath}");
-			return;
-		}
+		if (Library.InvalidFileExtensions.Contains(ext))
+			return false;
 		
-		var dir = new DirectoryInfo(path);
-		var dirs = dir.GetDirectories();
-		var files = dir.GetFiles();
+		if (Library.ValidFileExtensions.Contains(ext) == false)
+			return false;
 
-		foreach (var fileInfo in files)
-			tasks.Add(AddProjectFile(fileInfo));
-		
-		// ReSharper disable once LoopCanBeConvertedToQuery
-		foreach (var subDir in dirs.OrderBy(d => d.Name))
-		{
-			if (AppRunnerSettings.AbsoluteNotPaths.Any(s => s.Equals(subDir.FullName + Path.DirectorySeparatorChar, StringComparison.Ordinal)))
-				continue;
+		// drop entire paths you don’t want to enter
+		if (AppRunnerSettings.AbsoluteNotPaths.Any(not => fullName.StartsWith(not, StringComparison.Ordinal)))
+			return false;
 
-			if (AppRunnerSettings.NotFolderNames.Any(s => s.Equals(subDir.Name, StringComparison.Ordinal)))
-				continue;
-			
-			await RecurseProjectPathAsync(subDir.FullName, tasks);
-		}
+		// drop any file sitting in a forbidden folder
+		var folderName = Path.GetFileName(Path.GetDirectoryName(fullName)) ?? string.Empty;
 		
-		await Task.CompletedTask;
+		return AppRunnerSettings.NotFolderNames.Contains(folderName) == false;
 	}
-	
-	private async Task AddProjectFile(FileInfo fileInfo)
+
+	private async Task ProcessSingleFileAsync(string fullName)
 	{
-		if (Library.InvalidFileExtensions.Any(e => fileInfo.Name.EndsWith(e, StringComparison.Ordinal)))
-			return;
+		var scanned = new ScannedFile(fullName);
 
-		if (Library.ValidFileExtensions.Any(e => fileInfo.Extension.Equals(e, StringComparison.Ordinal)) == false)
-			return;
+		await scanned.LoadAndScanFileAsync(this);
 		
-		var scannedFile = new ScannedFile(fileInfo.FullName);
-
-		await scannedFile.LoadAndScanFileAsync(this);
-
-		ScannedFiles.TryAdd(fileInfo.FullName, scannedFile);
-	}
+		ScannedFiles.TryAdd(fullName, scanned);
+	}	
 	
 	#endregion
 	
 	#region CSS Generation
 
 	/// <summary>
-	/// Build method used by the CLI
+	/// Full build method used by the CLI
 	/// </summary>
-	public async Task BuildAndSaveCss()
+	public async Task FullBuildAndSaveCss()
 	{
-		CssBuildStopwatch.Restart();
-
-		LastCss = BuildCss();
-
-		await File.WriteAllTextAsync(AppRunnerSettings.NativeCssOutputFilePath, LastCss);
-
-		CssBuildStopwatch.Stop();
-
-		Messages.Add($"{LastCss.Length.FormatBytes()} written to {AppRunnerSettings.CssOutputFilePath} in {CssBuildStopwatch.FormatTimer()}");
-		Messages.Add($"Build complete at {DateTime.Now:HH:mm:ss.fff}");
-		Messages.Add(Strings.DotLine.Repeat(Entities.Library.Library.MaxConsoleWidth));
-
-		await RenderMessagesAsync();
+		await BuildAndSaveCss();
 	}
 
 	/// <summary>
-	/// Generate the final CSS output; used internally and for tests
+	/// Project file change build method used by the CLI
 	/// </summary>
-	/// <returns></returns>
-    public string BuildCss()
+	public async Task ProjectChangeBuildAndSaveCss()
 	{
-		var sourceCss = AppState.StringBuilderPool.Get();
-		var workingSb = AppState.StringBuilderPool.Get();
+		await BuildAndSaveCss("project");
+	}
 
-		try
+	private async Task BuildAndSaveCss(string mode = "")
+	{
+		CssBuildStopwatch.Restart();
+
+		LastCss = mode switch
 		{
-			sourceCss
-				.AppendResetCss(this)
-				.AppendFormsCss(this)
-				.AppendUtilityClassMarker(this)
+			"project" => await AppRunnerExtensions.ProjectChangeBuildCssAsync(this),
+			_ => await AppRunnerExtensions.FullBuildCssAsync(this)
+		};
 
-				.AppendProcessedSourceCss(this)
-
-				.ProcessAtApplyStatementsAndTrackDependencies(this)
-
-				.InjectUtilityClassesCss(this)
-				.ProcessAtVariantStatements(this)
-
-				.ProcessFunctionsAndTrackDependencies(this)
-				.InjectRootDependenciesCss(this)
-				.MoveComponentsLayer(this);
-
-			if (AppRunnerSettings.UseDarkThemeClasses)
-				sourceCss.ProcessDarkThemeClasses(this);
-			
-			return AppRunnerSettings.UseMinify ? sourceCss.ToString().CompactCss(workingSb) : sourceCss.ReformatCss(workingSb).ToString().NormalizeLinebreaks(AppRunnerSettings.LineBreak);
-		}
-		finally
+		if (string.IsNullOrEmpty(LastCss) || string.IsNullOrEmpty(AppRunnerSettings.NativeCssOutputFilePath) || AppRunnerSettings.NativeCssOutputFilePath.EndsWith(".css", StringComparison.Ordinal) == false)
 		{
-			AppState.StringBuilderPool.Return(sourceCss);
-			AppState.StringBuilderPool.Return(workingSb);
+			Messages.Clear();
 		}
+		else
+		{
+			await File.WriteAllTextAsync(AppRunnerSettings.NativeCssOutputFilePath, LastCss);
+
+			CssBuildStopwatch.Stop();
+
+			Messages.Add($"{LastCss.Length.FormatBytes()} written to {AppRunnerSettings.CssOutputFilePath} in {CssBuildStopwatch.FormatTimer()}");
+			Messages.Add($"Build complete at {DateTime.Now:HH:mm:ss.fff}");
+			Messages.Add(Strings.DotLine.Repeat(Entities.Library.Library.MaxConsoleWidth));
+		}
+
+		await RenderMessagesAsync();
 	}
 
     /// <summary>
@@ -712,100 +375,131 @@ public sealed class AppRunner
 		await Task.CompletedTask;
 	}
 
-	private bool ImportChangesPending()
+	private string CssImportChangesPending()
 	{
-		foreach (var fileInfo in AppRunnerSettings.Imports)
+		foreach (var importFile in AppRunnerSettings.CssImports.Values)
 		{
-			if (File.Exists(fileInfo.FullName) == false)
-				return true;
+			if (File.Exists(importFile.FileInfo.FullName) == false)
+				return string.Empty;
 
-			var currentFileInfo = new FileInfo(fileInfo.FullName);
+			var currentFileInfo = new FileInfo(importFile.FileInfo.FullName);
 
-			if (fileInfo.Length != currentFileInfo.Length || fileInfo.CreationTimeUtc != currentFileInfo.CreationTimeUtc || fileInfo.LastWriteTimeUtc != currentFileInfo.LastWriteTimeUtc)
-				return true;
+			if (importFile.FileInfo.Length != currentFileInfo.Length || importFile.FileInfo.CreationTimeUtc != currentFileInfo.CreationTimeUtc || importFile.FileInfo.LastWriteTimeUtc != currentFileInfo.LastWriteTimeUtc)
+				return CreatePathMessage("Changed", currentFileInfo.FullName);
 		}
 
-		return false;
+		return string.Empty;
 	}
-	
+
+	/// <summary>
+	/// 
+	/// </summary>
+	/// <returns>true, when work was performed</returns>
 	public async Task<bool> ProcessWatchQueues()
 	{
 		while (ProcessingWatchQueue)
 			await Task.Delay(25);
 
 		ProcessingWatchQueue = true;
+
+		#region Process Full Rebuilds
 		
-		var performRebuild = ImportChangesPending();
-		var performedWork = performRebuild;
-		
-		if (performRebuild || RestartAppQueue.IsEmpty == false)
+		var message = string.Empty;
+		var sourceCssChanged = RestartAppQueue.Any(kvp => kvp.Value.FullPath == AppRunnerSettings.NativeCssFilePath);
+		var cssImportsChangedMessage = CssImportChangesPending();
+
+		if (sourceCssChanged || string.IsNullOrEmpty(cssImportsChangedMessage) == false)
 		{
-			var message = performRebuild ? "Import file(s) change, rebuilding..." : "Source CSS file changed, rebuilding...";
-
-			if (RestartAppQueue.Any(kvp => kvp.Value.FullPath == AppRunnerSettings.NativeCssFilePath))
-				performRebuild = true;
-
-			if (File.Exists(AppRunnerSettings.NativeCssFilePath) == false && RestartAppQueue.Any(kvp => ((RenamedEventArgs)kvp.Value).OldFullPath == AppRunnerSettings.NativeCssFilePath))
-			{
-				var fcr = (RenamedEventArgs?)RestartAppQueue.LastOrDefault(kvp => ((RenamedEventArgs)kvp.Value).OldFullPath == AppRunnerSettings.NativeCssFilePath).Value;
-
-				if (fcr is not null)
-				{
-					if (File.Exists(fcr.FullPath) == false)
-					{
-						await Console.Out.WriteLineAsync("Renamed source CSS file cannot be found, exiting");
-						await Console.Out.WriteLineAsync($"({fcr.FullPath})");
-						await Console.Out.WriteLineAsync("");
-
-						await ShutDownWatchersAsync();
-
-						Environment.Exit(1);
-					}
-
-					message = $"Renamed: {Path.GetFileName(fcr.OldFullPath)} => {Path.GetFileName(fcr.FullPath)}";
-						
-					_cssFilePath = _cssFilePath.TrimEnd(AppRunnerSettings.CssFileNameOnly) + Path.GetFileName(fcr.FullPath);
-					
-					Initialize();
-				}
-				
-				performRebuild = true;
-			}
-
-			if (performRebuild)
+			if (sourceCssChanged)
 			{
 				if (File.Exists(AppRunnerSettings.NativeCssFilePath) == false)
+				{
+					var fcr = (RenamedEventArgs?)RestartAppQueue.LastOrDefault(kvp =>
+						((RenamedEventArgs)kvp.Value).OldFullPath == AppRunnerSettings.NativeCssFilePath).Value;
+
+					sourceCssChanged = false;
+
+					if (fcr is not null)
+					{
+						if (File.Exists(fcr.FullPath) == false)
+						{
+							await Console.Out.WriteLineAsync("Renamed source CSS file cannot be found, exiting");
+							await Console.Out.WriteLineAsync($"({fcr.FullPath})");
+							await Console.Out.WriteLineAsync("");
+
+							await ShutDownWatchersAsync();
+
+							Environment.Exit(1);
+						}
+
+						message = $"Renamed: {Path.GetFileName(fcr.OldFullPath)} => {Path.GetFileName(fcr.FullPath)}";
+
+						_cssFilePath = _cssFilePath.TrimEnd(AppRunnerSettings.CssFileNameOnly) +
+						               Path.GetFileName(fcr.FullPath);
+
+						Initialize();
+
+						sourceCssChanged = true;
+					}
+				}
+			}
+
+			if (sourceCssChanged || string.IsNullOrEmpty(cssImportsChangedMessage) == false)
+			{
+				if (sourceCssChanged && File.Exists(AppRunnerSettings.NativeCssFilePath) == false)
 				{
 					await Console.Out.WriteLineAsync("Source CSS file cannot be found, exiting");
 					await Console.Out.WriteLineAsync($"({AppRunnerSettings.NativeCssFilePath})");
 					await Console.Out.WriteLineAsync("");
+
+					await ShutDownWatchersAsync();
 
 					Environment.Exit(1);
 				}
 
 				await ShutDownWatchersAsync();
 
+				if (string.IsNullOrEmpty(message) == false)
+				{
+					await AddMessageAsync(message);
+				}
+				else
+				{
+					if (sourceCssChanged)
+						await AddCssPathMessageAsync();
+					else if (string.IsNullOrEmpty(cssImportsChangedMessage) == false)
+						await AddMessageAsync(cssImportsChangedMessage);
+				}
+
+				if (await ReInitializeAsync())
+				{
+					await PerformFileScanAsync();
+					await FullBuildAndSaveCss();
+				}
+				else
+				{
+					Messages.Clear();
+					await RenderMessagesAsync();
+				}
+
+				RestartAppQueue.Clear();
 				RebuildProjectQueue.Clear();
 
-				await AddCssPathMessageAsync();
-				await AddMessageAsync(message);
-
-				await ReInitializeAsync();
-				await PerformFileScanAsync();
-				await BuildAndSaveCss();
 				await StartWatchingAsync();
 				
-				if (performedWork == false)
-					performedWork = true;
+				ProcessingWatchQueue = false;
+
+				return sourceCssChanged || string.IsNullOrEmpty(cssImportsChangedMessage) == false;
 			}
-			
+
 			RestartAppQueue.Clear();
 		}
-
+		
+		#endregion
+		
 		if (RebuildProjectQueue.IsEmpty == false)
 		{
 			var messages = new List<string>();
-
 			var rebuildProjectQueue = RebuildProjectQueue.ToList();
 			
 			foreach (var kvp in rebuildProjectQueue.OrderBy(k => k.Key))
@@ -851,15 +545,13 @@ public sealed class AppRunner
 						ScannedFiles.TryAdd(fcr.FullPath, newScannedFile);
 					}
 
-					messages.Add(fcr.ChangeType is WatcherChangeTypes.Changed
-						? $"Changed : {Path.GetFileName(fcr.FullPath)}"
-						: $"Added : {Path.GetFileName(fcr.FullPath)}");
+					messages.Add(fcr.ChangeType is WatcherChangeTypes.Changed ? CreatePathMessage("Changed", fcr.FullPath) : CreatePathMessage("Added", fcr.FullPath));
 				}
 				else if (fcr.ChangeType is WatcherChangeTypes.Deleted)
 				{
 					ScannedFiles.Remove(fcr.FullPath, out _);
 					
-					messages.Add($"Deleted : {Path.GetFileName(fcr.FullPath)}");
+					messages.Add(CreatePathMessage("Deleted", fcr.FullPath));
 				}				
 				else if (fcr.ChangeType is WatcherChangeTypes.Renamed)
 				{
@@ -885,26 +577,25 @@ public sealed class AppRunner
 			{
 				ProcessingWatchQueue = false;
 
-				return performedWork;
+				return false;
 			}
 
-			await AddCssPathMessageAsync();
-
-			foreach (var message in messages)
-				await AddMessageAsync(message);				
+			foreach (var msg in messages)
+				await AddMessageAsync(msg);				
 				
 			ProcessScannedFileUtilityClassDependencies(this);
 
 			await AddMessageAsync($"Processed changes in {FileScanStopwatch.FormatTimer()}");
-			await BuildAndSaveCss();
+			await ProjectChangeBuildAndSaveCss();
 				
-			if (performedWork == false)
-				performedWork = true;
+			ProcessingWatchQueue = false;
+
+			return true;
 		}
 
 		ProcessingWatchQueue = false;
 
-		return performedWork;
+		return false;
 	}
 	
 	#endregion

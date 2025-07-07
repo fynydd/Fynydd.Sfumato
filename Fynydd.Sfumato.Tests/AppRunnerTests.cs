@@ -1,3 +1,6 @@
+using Microsoft.DotNet.PlatformAbstractions;
+using Microsoft.Extensions.ObjectPool;
+
 namespace Fynydd.Sfumato.Tests;
 
 public class AppRunnerTests
@@ -5,8 +8,14 @@ public class AppRunnerTests
     [Fact]
     public async Task ProcessScannedFileUtilityClassDependencies()
     {
+        var basePath = ApplicationEnvironment.ApplicationBasePath;
+        var root = basePath[..basePath.IndexOf("Fynydd.Sfumato.Tests", StringComparison.Ordinal)];
+        var filePath = Path.GetFullPath(Path.Combine(root, "Fynydd.Sfumato.Tests/SampleWebsite/wwwroot/index.html"));
+        
+        Assert.True(File.Exists(filePath));
+        
         var appRunner = new AppRunner(new AppState());
-        var scannedFile = new ScannedFile("../../../SampleWebsite/wwwroot/index.html");
+        var scannedFile = new ScannedFile(filePath);
 
         await scannedFile.LoadAndScanFileAsync(appRunner);
         
@@ -16,68 +25,100 @@ public class AppRunnerTests
     [Fact]
     public async Task ProcessAtApplyStatementsAndTrackDependencies()
     {
-        var appRunner = new AppRunner(new AppState(), "../../../SampleCss/sample.css");
+        var basePath = ApplicationEnvironment.ApplicationBasePath;
+        var root = basePath[..basePath.IndexOf("Fynydd.Sfumato.Tests", StringComparison.Ordinal)];
+        var filePath = Path.GetFullPath(Path.Combine(root, "Fynydd.Sfumato.Tests/SampleCss/sample.css"));
+
+        Assert.True(File.Exists(filePath));
+        
+        var appRunner = new AppRunner(new AppState(), filePath);
 
         await appRunner.LoadCssFileAsync();
+        await appRunner.PerformFileScanAsync();
 
-        var sb = new StringBuilder();
+        appRunner.ProcessScannedFileUtilityClassDependencies(appRunner);
 
-        sb.AppendProcessedSourceCss(appRunner);
-        sb.ProcessAtApplyStatementsAndTrackDependencies(appRunner);
-        sb.ProcessAtVariantStatements(appRunner);
+        var sb = new StringBuilder(await AppRunnerExtensions.FullBuildCssAsync(appRunner));
 
         Assert.False(sb.Contains("@apply"));
         
         Assert.True(sb.Contains("tab-size: 4;"));
         Assert.True(sb.Contains("font-size: var(--text-base);"));
-        Assert.True(sb.Contains("--sf-leading: calc(var(--spacing) * 6) !important;\nline-height: var(--sf-leading) !important;"));
+        Assert.True(sb.Contains("--sf-leading: calc(var(--spacing) * 6) !important;"));
         
         Assert.False(sb.Contains("@variant"));
         Assert.True(sb.Contains("@media (width >= 475px) {"));
     }
 
     [Fact]
-    public void CssImportStatements()
+    public async Task CssImportStatements()
     {
-        var appRunner = new AppRunner(new AppState(), "../../../SampleCss/sample.css")
-        {
-            AppRunnerSettings =
-            {
-                CssFilePath = "../../../SampleCss/sample.css"
-            }
-        };
+        var basePath = ApplicationEnvironment.ApplicationBasePath;
+        var root = basePath[..basePath.IndexOf("Fynydd.Sfumato.Tests", StringComparison.Ordinal)];
+        var filePath = Path.GetFullPath(Path.Combine(root, "Fynydd.Sfumato.Tests/SampleCss/sample.css"));
 
-        appRunner.AppRunnerSettings.LoadCssAndExtractSfumatoBlock();
-        appRunner.AppRunnerSettings.ImportPartials();
+        Assert.True(File.Exists(filePath));
 
-        var indexOfPartialTestClass = appRunner.AppRunnerSettings.ProcessedCssContent.IndexOf(".partial-test", StringComparison.Ordinal);
-        var indexOfPartial2TestClass = appRunner.AppRunnerSettings.ProcessedCssContent.IndexOf(".partial2-test", StringComparison.Ordinal);
-        var indexOfPartial3TestClass = appRunner.AppRunnerSettings.ProcessedCssContent.IndexOf(".partial3-test", StringComparison.Ordinal);
-        var indexOfPartial4TestClass = appRunner.AppRunnerSettings.ProcessedCssContent.IndexOf(".partial4-test", StringComparison.Ordinal);
+        var appRunner = new AppRunner(new AppState(), filePath);
+
+        await appRunner.LoadCssFileAsync();
+
+        appRunner.AppRunnerSettings.CssContent.LoadSfumatoSettings(appRunner);
+
+        var sb = new StringBuilder(appRunner.AppRunnerSettings.CssContent);
+        var (index, length) = sb.ExtractCssImportStatements(appRunner, true);
         
-        Assert.False(appRunner.AppRunnerSettings.ProcessedCssContent.Contains("@import", StringComparison.Ordinal));
+        var indexOfPartialTestClass = appRunner.ImportsCssSegment.Content.IndexOf(".partial-test");
+        var indexOfPartial2TestClass = appRunner.ImportsCssSegment.Content.IndexOf(".partial2-test");
+        var indexOfPartial3TestClass = appRunner.ImportsCssSegment.Content.IndexOf(".partial3-test");
+        var indexOfPartial4TestClass = appRunner.ImportsCssSegment.Content.IndexOf(".partial4-test");
         
+        Assert.False(appRunner.ImportsCssSegment.Content.Contains("@import"));
+
+        Assert.Equal(0, index);
+        Assert.Equal(22, length);
+
         Assert.True(indexOfPartialTestClass > 0);
         Assert.True(indexOfPartial2TestClass > 0);
         Assert.True(indexOfPartial3TestClass > 0);
+
         Assert.Equal(0, indexOfPartial4TestClass);
+
+        Assert.True(indexOfPartial3TestClass > indexOfPartial4TestClass);
         Assert.True(indexOfPartial2TestClass > indexOfPartial3TestClass);
+        Assert.True(indexOfPartialTestClass > indexOfPartial2TestClass);
+
+        Assert.Equal(4, appRunner.AppRunnerSettings.CssImports.Count);
+
+        appRunner.AppRunnerSettings.CssImports.TryAdd("test", new CssImportFile
+        {
+            CssContent = new StringBuilder(),
+            FileInfo = new FileInfo("test.css"),
+            Pool = new DefaultObjectPoolProvider().CreateStringBuilderPool(),
+            Touched = true
+        });
+        
+        Assert.Equal(5, appRunner.AppRunnerSettings.CssImports.Count);
+
+        _ = sb.ExtractCssImportStatements(appRunner, true);
+
+        Assert.Equal(4, appRunner.AppRunnerSettings.CssImports.Count);
     }
 
     [Fact]
-    public void ProcessSfumatoBlock()
+    public async Task ProcessSfumatoBlock()
     {
-        var appRunner = new AppRunner(new AppState(), "../../../SampleCss/sample.css")
-        {
-            AppRunnerSettings =
-            {
-                CssFilePath = "../../../SampleCss/sample.css"
-            }
-        };
+        var basePath = ApplicationEnvironment.ApplicationBasePath;
+        var root = basePath[..basePath.IndexOf("Fynydd.Sfumato.Tests", StringComparison.Ordinal)];
+        var filePath = Path.GetFullPath(Path.Combine(root, "Fynydd.Sfumato.Tests/SampleCss/sample.css"));
 
-        appRunner.AppRunnerSettings.LoadCssAndExtractSfumatoBlock();
-        appRunner.AppRunnerSettings.ExtractSfumatoItems();
-        appRunner.AppRunnerSettings.ProcessProjectSettings();
+        Assert.True(File.Exists(filePath));
+
+        var appRunner = new AppRunner(new AppState(), filePath);
+
+        await appRunner.LoadCssFileAsync();
+
+        appRunner.AppRunnerSettings.CssContent.LoadSfumatoSettings(appRunner);
 
         Assert.True(appRunner.AppRunnerSettings.SfumatoBlockItems.ContainsKey("--spacing"));
         Assert.True(appRunner.AppRunnerSettings.SfumatoBlockItems.ContainsKey("--paths"));
@@ -94,9 +135,17 @@ public class AppRunnerTests
     [Fact]
     public async Task BuildCssFile()
     {
-        var appRunner = new AppRunner(new AppState(), "../../../SampleCss/sample.css");
+        var basePath = ApplicationEnvironment.ApplicationBasePath;
+        var root = basePath[..basePath.IndexOf("Fynydd.Sfumato.Tests", StringComparison.Ordinal)];
+        var filePath = Path.GetFullPath(Path.Combine(root, "Fynydd.Sfumato.Tests/SampleCss/sample.css"));
+
+        Assert.True(File.Exists(filePath));
+
+        var appRunner = new AppRunner(new AppState(), filePath);
 
         await appRunner.LoadCssFileAsync();
+
+        appRunner.AppRunnerSettings.CssContent.LoadSfumatoSettings(appRunner);
 
         appRunner.ScannedFiles.TryAdd("test", new ScannedFile("")
         {
@@ -105,13 +154,13 @@ public class AppRunnerTests
 
         appRunner.ProcessScannedFileUtilityClassDependencies(appRunner);
         
-        var css = appRunner.BuildCss();
+        var css = await AppRunnerExtensions.FullBuildCssAsync(appRunner);
         
         var indexOfRoot = css.IndexOf(":root", StringComparison.Ordinal);
         var indexOfFontSansClass = css.IndexOf(".font-sans", StringComparison.Ordinal);
         var indexOfTestClass = css.IndexOf(".test", StringComparison.Ordinal);
         
-        Assert.Equal(1235, indexOfRoot);
+        Assert.Equal(81, indexOfRoot);
         Assert.True(indexOfFontSansClass > 0);
         Assert.True(indexOfTestClass > 0);
     }

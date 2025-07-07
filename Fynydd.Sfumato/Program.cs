@@ -235,8 +235,6 @@ internal class Program
 
 			foreach (var appRunner in appState.AppRunners)
 			{
-				await appRunner.AddCssPathMessageAsync();
-
 				tasks.Add(appRunner.PerformFileScanAsync());
 			}
 
@@ -244,7 +242,7 @@ internal class Program
 			tasks.Clear();
 
 			foreach (var appRunner in appState.AppRunners)
-				tasks.Add(appRunner.BuildAndSaveCss());
+				tasks.Add(appRunner.FullBuildAndSaveCss());
 
 			await Task.WhenAll(tasks);
 
@@ -261,7 +259,7 @@ internal class Program
 
 				} while (appState.AppRunners.Any(r => r.Messages.Count != 0));
 
-				await Console.Out.WriteLineAsync("Watching; Press ESC to Exit");
+				await Console.Out.WriteLineAsync("Watching; press ESC to exit");
 
 				var cancellationTokenSource = new CancellationTokenSource();
 
@@ -334,7 +332,7 @@ internal class Program
 
 						} while (appState.AppRunners.Any(r => r.Messages.Count != 0));
 
-						await Console.Out.WriteLineAsync("Watching; Press ESC to Exit");
+						await Console.Out.WriteLineAsync("Watching; press ESC to exit");
 					}
 
 					if (Console.IsInputRedirected)
