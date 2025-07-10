@@ -5,9 +5,9 @@
         <TargetFramework>net9.0</TargetFramework>
         <LangVersion>13</LangVersion>
         <Nullable>enable</Nullable>
-        <AssemblyVersion>6.0.37.0</AssemblyVersion>
-        <FileVersion>6.0.37.0</FileVersion>
-        <PackageVersion>6.0.37</PackageVersion>
+        <AssemblyVersion>6.0.38.0</AssemblyVersion>
+        <FileVersion>6.0.38.0</FileVersion>
+        <PackageVersion>6.0.38</PackageVersion>
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>sfumato</ToolCommandName>
         <PackageOutputPath>./nupkg</PackageOutputPath>
@@ -29,7 +29,7 @@
         <PackageProjectUrl>https://github.com/fynydd/Fynydd.Sfumato</PackageProjectUrl>
         <RepositoryUrl>https://github.com/fynydd/Fynydd.Sfumato</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <PackageReleaseNotes>Forms input styles using better focus effect</PackageReleaseNotes>
+        <PackageReleaseNotes>Allows @@ escaping in .NET Razor files for container utilities, which begin with @</PackageReleaseNotes>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
         <PackageIcon>sfumato-icon.png</PackageIcon>
@@ -37,10 +37,10 @@
 
     <ItemGroup>
         <PackageReference Include="BenchmarkDotNet" Version="0.15.2" />
-        <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.6" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.6" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.6" />
-        <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="9.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.7" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.7" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.7" />
+        <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="9.0.7" />
     </ItemGroup>
     
     <ItemGroup>
