@@ -2,7 +2,7 @@ namespace Fynydd.Sfumato.Entities.Library;
 
 public static class LibraryPseudoClasses
 {
-    public static Dictionary<string, VariantMetadata> PseudoclassPrefixes { get; } = new ()
+    public static PrefixTrie<VariantMetadata> PseudoclassPrefixes { get; } = new ()
     {
         {
 	        "hover",
@@ -124,7 +124,43 @@ public static class LibraryPseudoClasses
 			    SelectorSuffix = ":only-of-type"
 		    }
 	    },
+		{
+		    "nth-",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SelectorSuffix = ":nth-child({0})",
+			    Inheritable = true
+		    }
+	    },
 	    {
+		    "nth-last-",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SelectorSuffix = ":nth-last-child({0})",
+			    Inheritable = true
+		    }
+	    },
+	    {
+		    "nth-of-type-",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SelectorSuffix = ":nth-of-type({0})",
+			    Inheritable = true
+		    }
+	    },
+	    {
+		    "nth-last-of-type-",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SelectorSuffix = ":nth-last-of-type({0})",
+			    Inheritable = true
+		    }
+	    },
+		{
 		    "empty",
 		    new VariantMetadata
 		    {
@@ -315,7 +351,8 @@ public static class LibraryPseudoClasses
 		    new VariantMetadata
 		    {
 			    PrefixType = "pseudoclass",
-			    SelectorSuffix = ":is([open],:popover-open,:open)"
+			    SelectorSuffix = ":is([open],:popover-open,:open)",
+			    PrioritySort = 99
 		    }
 	    },
 	    {
@@ -323,7 +360,8 @@ public static class LibraryPseudoClasses
 		    new VariantMetadata
 		    {
 			    PrefixType = "pseudoclass",
-			    SelectorSuffix = ":is([closed],:popover-closed,:closed)"
+			    SelectorSuffix = ":is([closed],:popover-closed,:closed)",
+			    PrioritySort = 99
 		    }
 	    },
 	    {
@@ -339,7 +377,8 @@ public static class LibraryPseudoClasses
 		    new VariantMetadata
 		    {
 			    PrefixType = "pseudoclass",
-			    SelectorSuffix = ":where(:dir(ltr),[dir=ltr],[dir=ltr] *)"
+			    SelectorSuffix = ":where(:dir(ltr),[dir=ltr],[dir=ltr] *)",
+			    PrioritySort = 99
 		    }
 	    },
 	    {
@@ -347,7 +386,8 @@ public static class LibraryPseudoClasses
 		    new VariantMetadata
 		    {
 			    PrefixType = "pseudoclass",
-			    SelectorSuffix = ":where(:dir(rtl),[dir=rtl],[dir=rtl] *)"
+			    SelectorSuffix = ":where(:dir(rtl),[dir=rtl],[dir=rtl] *)",
+			    PrioritySort = 99
 		    }
 	    },
 	    {

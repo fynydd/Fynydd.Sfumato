@@ -21,13 +21,13 @@ public sealed class CssClass : IDisposable
     /// Name broken into variant and core segments.
     /// (e.g. "dark:tabp:[&.active]:text-base/6" => ["dark", "tabp", "[&.active]", "text-base/6"])
     /// </summary>
-    public HashSet<string> AllSegments { get; } = new (StringComparer.Ordinal);
+    public List<string> AllSegments { get; } = [];
 
     /// <summary>
     /// Variant segments used in the class name.
     /// (e.g. "dark:tabp:[&.active]:text-base/6" => ["dark", "tabp", "[&.active]"])
     /// </summary>
-    public Dictionary<string,VariantMetadata> VariantSegments { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, VariantMetadata> VariantSegments { get; } = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Master class definition for this utility class.
@@ -63,6 +63,12 @@ public sealed class CssClass : IDisposable
     #endregion
     
     #region Lifecycle
+
+    public CssClass(AppRunner appRunner)
+    {
+        AppRunner = appRunner;
+        Selector = string.Empty;
+    }
 
     public CssClass(AppRunner appRunner, string selector, bool fromRazorFile = false)
     {
@@ -139,18 +145,23 @@ public sealed class CssClass : IDisposable
             }
         });
     }
-    
+
+    public void SplitSelectorSegments()
+    {
+        foreach (var segment in Selector.SplitByTopLevel(':'))
+            AllSegments.Add(segment.ToString());
+    }
+
     public void Initialize(bool fromRazorFile)
     {
-        IsImportant = Selector.EndsWith('!');
+        IsImportant = Selector[^1] == '!';
 
         var hasBrackets = Selector.IndexOfAny(['[', '(']) >= 0;
-        var hasColons = Selector.Contains(':');
+        var hasColons = Selector.IndexOf(':') > 0;
 
         if (hasColons)
         {
-            foreach (var segment in Selector.SplitByTopLevel(':'))
-                AllSegments.Add(fromRazorFile ? NormalizeSegment(segment) : segment.ToString());
+            SplitSelectorSegments();
         }
         else
         {
@@ -158,7 +169,7 @@ public sealed class CssClass : IDisposable
             {
                 if (fromRazorFile)
                     Selector = NormalizeSegment(Selector);
-                
+
                 if (AppRunner.Library.SimpleClasses.TryGetValue(Selector, out ClassDefinition))
                 {
                     IsValid = true;
@@ -199,12 +210,12 @@ public sealed class CssClass : IDisposable
             if (AllSegments.Count <= 1)
                 return;
             
-            VariantSegments.Clear();
-            
             // One or more invalid variants invalidate the entire utility class
 
-            foreach (var segment in AllSegments.Take(AllSegments.Count - 1))
+            for (var i = 0; i < AllSegments.Count - 1; i++) // skip last item
             {
+                var segment = AllSegments[i];
+                
                 if (string.IsNullOrEmpty(segment))
                     return;
 
@@ -215,13 +226,6 @@ public sealed class CssClass : IDisposable
 
                     VariantSegments.Add(segment, mediaQuery);
                 }
-                else if (segment.TryVariantIsContainerQuery(AppRunner, out var containerQuery))
-                {
-                    if (containerQuery is null)
-                        return;
-
-                    VariantSegments.Add(segment, containerQuery);
-                }
                 else if (segment.TryVariantIsPseudoClass(AppRunner, out var pseudoClass))
                 {
                     if (pseudoClass is null)
@@ -229,10 +233,17 @@ public sealed class CssClass : IDisposable
 
                     VariantSegments.Add(segment, pseudoClass);
                     
-                    if (pseudoClass.SelectorSuffix.Contains(":where(", StringComparison.Ordinal) || pseudoClass.SelectorSuffix.Contains(":is(", StringComparison.Ordinal))
-                        SelectorSort = 99;
+                    if (pseudoClass.PrioritySort > 0)
+                        SelectorSort = pseudoClass.PrioritySort;
                     else
                         SelectorSort++;
+                }
+                else if (segment.TryVariantIsContainerQuery(AppRunner, out var containerQuery))
+                {
+                    if (containerQuery is null)
+                        return;
+
+                    VariantSegments.Add(segment, containerQuery);
                 }
                 else if (segment.TryVariantIsGroup(AppRunner, out var group))
                 {
@@ -248,13 +259,6 @@ public sealed class CssClass : IDisposable
 
                     VariantSegments.Add(segment, peer);
                 }
-                else if (segment.TryVariantIsNth(out var nth))
-                {
-                    if (nth is null)
-                        return;
-
-                    VariantSegments.Add(segment, nth);
-                }
                 else if (segment.TryVariantIsHas(AppRunner, out var has))
                 {
                     if (has is null)
@@ -262,19 +266,19 @@ public sealed class CssClass : IDisposable
 
                     VariantSegments.Add(segment, has);
                 }
-                else if (segment.TryVariantIsSupports(AppRunner, out var supports))
+                else if (segment.TryVariantIsSupports(AppRunner, out var supportsQuery))
                 {
-                    if (supports is null)
+                    if (supportsQuery is null)
                         return;
 
-                    VariantSegments.Add(segment, supports);
+                    VariantSegments.Add(segment, supportsQuery);
                 }
-                else if (segment.TryVariantIsNotSupports(AppRunner, out var notSupports))
+                else if (segment.TryVariantIsStartingStyleQuery(AppRunner, out var startingStyleQuery))
                 {
-                    if (notSupports is null)
+                    if (startingStyleQuery is null)
                         return;
 
-                    VariantSegments.Add(segment, notSupports);
+                    VariantSegments.Add(segment, startingStyleQuery);
                 }
                 else if (segment.TryVariantIsData(out var data))
                 {
@@ -350,7 +354,7 @@ public sealed class CssClass : IDisposable
     {
         try
         {
-            var prefix = AppRunner.Library.ScannerClassNamePrefixes.GetLongestMatchingPrefix(AllSegments.Last().Contains('/') ? AllSegments.Last()[..AllSegments.Last().IndexOf('/')] : AllSegments.Last());
+            AppRunner.Library.ScannerClassNamePrefixes.TryGetLongestMatchingPrefix(AllSegments.Last().Contains('/') ? AllSegments.Last()[..AllSegments.Last().IndexOf('/')] : AllSegments.Last(), out var prefix, out _);
 
             if (string.IsNullOrEmpty(prefix))
                 return;
@@ -535,7 +539,7 @@ public sealed class CssClass : IDisposable
             {
                 // Iterate through all data type classes to find a prefix match
 
-                var classDictionaries = new List<Dictionary<string, ClassDefinition>>
+                var classDictionaries = new List<PrefixTrie<ClassDefinition>>
                 {
                     AppRunner.Library.LengthClasses,
                     AppRunner.Library.ColorClasses,
@@ -879,6 +883,7 @@ public sealed class CssClass : IDisposable
     public void GenerateWrappers()
     {
         var variantCount = VariantSegments.Count;
+
         if (variantCount == 0)
             return;
 

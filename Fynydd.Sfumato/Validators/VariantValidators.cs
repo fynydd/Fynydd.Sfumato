@@ -2,17 +2,16 @@ namespace Fynydd.Sfumato.Validators;
 
 public static class VariantValidators
 {
-    #region Identify Variants
-
     public static bool TryVariantIsMediaQuery(this string variant, AppRunner appRunner, out VariantMetadata? cssMediaQuery)
     {
         cssMediaQuery = null;
 
-        if (appRunner.Library.MediaQueryPrefixes.TryGetValue(variant, out cssMediaQuery))
-            return true;
+        return appRunner.Library.MediaQueryPrefixes.TryGetValue(variant, out cssMediaQuery);
+    }
 
-        if (appRunner.Library.SupportsQueryPrefixes.TryGetValue(variant, out cssMediaQuery))
-            return true;
+    public static bool TryVariantIsStartingStyleQuery(this string variant, AppRunner appRunner, out VariantMetadata? cssMediaQuery)
+    {
+        cssMediaQuery = null;
 
         return appRunner.Library.StartingStyleQueryPrefixes.TryGetValue(variant, out cssMediaQuery);
     }
@@ -21,6 +20,9 @@ public static class VariantValidators
     {
         cssMediaQuery = null;
 
+        if (variant[0] != '@')
+            return false;
+        
         var variantValue = variant;
         var indexOfSlash = variant.LastIndexOf('/');
 
@@ -37,35 +39,61 @@ public static class VariantValidators
     {
         pseudoClass = null;
 
-        return appRunner.Library.PseudoclassPrefixes.TryGetValue(variant.StartsWith('d') && variant.StartsWith("data-", StringComparison.OrdinalIgnoreCase) ? "data-" : variant, out pseudoClass);
+        if (appRunner.Library.PseudoclassPrefixes.TryGetValue(variant, out pseudoClass))
+            return true;
+        
+        if (variant[0] == 'd' && variant.StartsWith("data-", StringComparison.OrdinalIgnoreCase))
+            if (appRunner.Library.PseudoclassPrefixes.TryGetValue("data-", out pseudoClass))
+                return true;
+        
+        var bracketIndex = variant.IndexOf('[');
+
+        if (bracketIndex > 0 && appRunner.Library.PseudoclassPrefixes.TryGetValue(variant[..bracketIndex], out pseudoClass))
+        {
+            pseudoClass = pseudoClass.CreateNewPseudoClass(pseudoClass.SelectorSuffix.Replace("{0}", variant[(bracketIndex + 1)..^1].Replace('_', ' ')));
+            return true;
+        }
+        
+        var hasCustomValue = char.IsAsciiDigit(variant[^1]);
+
+        if (hasCustomValue == false)
+            return false;
+        
+        var lastHyphenIndex = variant.LastIndexOf('-');
+
+        if (lastHyphenIndex < 0 || appRunner.Library.PseudoclassPrefixes.TryGetValue(variant[..(lastHyphenIndex + 1)], out pseudoClass) == false)
+            return false;
+        
+        pseudoClass = pseudoClass.CreateNewPseudoClass(pseudoClass.SelectorSuffix.Replace("{0}", variant[(lastHyphenIndex + 1)..].Replace('_', ' ')));
+
+        return true;
     }
 
     public static bool TryVariantIsGroup(this string variant, AppRunner appRunner, out VariantMetadata? group)
     {
         group = null;
 
-        if (variant.StartsWith("group-has-["))
+        if (variant[0] != 'g' || variant.StartsWith("group-", StringComparison.Ordinal) == false)
+            return false;
+        
+        if (variant.Length > 12 && variant.StartsWith("group-has-[", StringComparison.Ordinal))
         {
             // group-has-[a]: or group-has-[p.my-class]: etc.
 
-            var variantValue = variant.TrimStart("group-has-");
-
-            if (string.IsNullOrEmpty(variantValue) || variantValue.StartsWith('[') == false || variantValue.EndsWith(']') == false)
-                return false;
-
-            variantValue = variantValue.TrimStart('[').TrimEnd(']');
+            var variantValue = variant[11..^1];
             
             group = new VariantMetadata
             {
                 PrefixType = "pseudoclass",
-                SelectorSuffix = $":is(:where(.group):has(:is({variantValue.Replace('_', ' ')})) *)"
+                SelectorSuffix = $":is(:where(.group):has(:is({variantValue.Replace('_', ' ')})) *)",
+                PrioritySort = 99
             };
         }
-        else if (variant.StartsWith("group-aria-"))
+        else if (variant.Length > 11 && variant.StartsWith("group-aria-", StringComparison.Ordinal))
         {
             // group-aria-checked:
 
-            var variantValue = variant.TrimStart("group-aria-");
+            var variantValue = variant[11..];
 
             if (string.IsNullOrEmpty(variantValue) || TryVariantIsPseudoClass(variantValue, appRunner, out var pseudoClass) == false)
                 return false;
@@ -76,14 +104,15 @@ public static class VariantValidators
             group = new VariantMetadata
             {
                 PrefixType = "pseudoclass",
-                SelectorSuffix = $":is(:where(.group{pseudoClass.SelectorSuffix}) *)"
+                SelectorSuffix = $":is(:where(.group{pseudoClass.SelectorSuffix}) *)",
+                PrioritySort = 99
             };
         }
-        else if (variant.StartsWith("group-"))
+        else if (variant.Length > 6)
         {
             // group-hover: group-focus/item: etc.
 
-            var variantValue = variant.TrimStart("group-");
+            var variantValue = variant[6..];
 
             if (string.IsNullOrEmpty(variantValue))
                 return false;
@@ -100,11 +129,11 @@ public static class VariantValidators
                 variantValue = variantValue[..indexOfSlash];
             }
 
-            if (variantValue.StartsWith('[') && variantValue.EndsWith(']'))
+            if (variantValue[0] == '[' && variantValue[^1] == ']')
             {
                 // group-[.is-published]:
 
-                variantValue = variantValue.TrimStart('[').TrimEnd(']');
+                variantValue = variantValue[1..^1];
 
                 if (string.IsNullOrEmpty(variantValue))
                     return false;
@@ -133,10 +162,6 @@ public static class VariantValidators
                 return false;
             }
         }
-        else
-        {
-            return false;
-        }
 
         return true;
     }
@@ -145,30 +170,29 @@ public static class VariantValidators
     {
         peer = null;
 
-        if (variant.StartsWith("peer-has-["))
+        if (variant[0] != 'p' || variant.StartsWith("peer-", StringComparison.Ordinal) == false)
+            return false;
+
+        if (variant.Length > 11 && variant.StartsWith("peer-has-[", StringComparison.Ordinal))
         {
             // peer-has-[a]: or peer-has-[p.my-class]: etc.
 
-            var variantValue = variant.TrimStart("peer-has-");
+            var variantValue = variant[10..^1];
 
-            if (string.IsNullOrEmpty(variantValue) || variantValue.StartsWith('[') == false || variantValue.EndsWith(']') == false)
-                return false;
-
-            variantValue = variantValue.TrimStart('[').TrimEnd(']');
-            
             peer = new VariantMetadata
             {
                 PrefixType = "pseudoclass",
-                SelectorSuffix = $":is(:where(.peer):has(:is({variantValue.Replace('_', ' ')})) ~ *)"
+                SelectorSuffix = $":is(:where(.peer):has(:is({variantValue.Replace('_', ' ')})) ~ *)",
+                PrioritySort = 99
             };
         }
-        else if (variant.StartsWith("peer-aria-"))
+        else if (variant.Length > 10 && variant.StartsWith("peer-aria-", StringComparison.Ordinal))
         {
             // peer-aria-checked:
 
-            var variantValue = variant.TrimStart("peer-aria-");
+            var variantValue = variant[10..];
 
-            if (string.IsNullOrEmpty(variantValue) || TryVariantIsPseudoClass(variantValue, appRunner, out var pseudoClass) == false)
+            if (TryVariantIsPseudoClass(variantValue, appRunner, out var pseudoClass) == false)
                 return false;
 
             if (pseudoClass is null)
@@ -177,18 +201,15 @@ public static class VariantValidators
             peer = new VariantMetadata
             {
                 PrefixType = "pseudoclass",
-                SelectorSuffix = $":is(:where(.peer{pseudoClass.SelectorSuffix}) ~ *)"
+                SelectorSuffix = $":is(:where(.peer{pseudoClass.SelectorSuffix}) ~ *)",
+                PrioritySort = 99
             };
         }
-        else if (variant.StartsWith("peer-"))
+        else if (variant.Length > 5)
         {
             // peer-hover: peer-focus: etc.
 
-            var variantValue = variant.TrimStart("peer-");
-
-            if (string.IsNullOrEmpty(variantValue))
-                return false;
-            
+            var variantValue = variant[5..];
             var indexOfSlash = variantValue.LastIndexOf('/');
             var slashValue = string.Empty;
 
@@ -201,15 +222,12 @@ public static class VariantValidators
                 variantValue = variantValue[..indexOfSlash];
             }
 
-            if (variantValue.StartsWith('[') && variantValue.EndsWith(']'))
+            if (variantValue[0] == '[' && variantValue[^1] == ']')
             {
                 // peer-[.is-published]:
 
-                variantValue = variantValue.TrimStart('[').TrimEnd(']');
+                variantValue = variantValue[1..^1];
 
-                if (string.IsNullOrEmpty(variantValue))
-                    return false;
-                        
                 peer = new VariantMetadata
                 {
                     PrefixType = "prefix",
@@ -234,81 +252,34 @@ public static class VariantValidators
                 return false;
             }
         }
-        else
-        {
-            return false;
-        }
 
         return true;
     }
-
-    public static bool TryVariantIsNth(this string variant, out VariantMetadata? nth)
-    {
-        nth = null;
-
-        if (variant.StartsWith("nth-", StringComparison.Ordinal) == false)
-            return false;
-        
-        var variantValue = variant.TrimStart("nth-last-of-type-").TrimStart("nth-of-type-").TrimStart("nth-last-").TrimStart("nth-");
-
-        if (string.IsNullOrEmpty(variantValue) || variantValue.Length == variant.Length)
-            return false;
-
-        if (variantValue.StartsWith('[') == false || variantValue.EndsWith(']') == false)
-            return false;
-        
-        // nth-[3n+1]:
-        var pseudoClass = variant.TrimEnd(variantValue);
-
-        if (string.IsNullOrEmpty(pseudoClass))
-            return false;
-
-        variantValue = variantValue.TrimStart('[').TrimEnd(']');
-
-        if (string.IsNullOrEmpty(variantValue))
-            return false;
-                        
-        nth = new VariantMetadata
-        {
-            PrefixType = "pseudoclass",
-            SelectorSuffix = $":{variant.Replace('_', ' ')}"
-        };
-
-        return true;
-    }    
 
     public static bool TryVariantIsHas(this string variant, AppRunner appRunner, out VariantMetadata? has)
     {
         has = null;
 
-        if (variant.StartsWith("has-", StringComparison.Ordinal) == false)
+        if (variant[0] != 'h' || variant.StartsWith("has-", StringComparison.Ordinal) == false)
             return false;
         
-        if (variant.StartsWith("has-["))
+        if (variant.Length > 6 && variant.StartsWith("has-[", StringComparison.Ordinal))
         {
             // has-[a]: or has-[a.link]: etc.
 
-            var variantValue = variant.TrimStart("has-");
+            var variantValue = variant[5..^1];
 
-            if (string.IsNullOrEmpty(variantValue) || variantValue.StartsWith('[') == false || variantValue.EndsWith(']') == false)
-                return false;
-
-            variantValue = variantValue.TrimStart('[').TrimEnd(']');
-            
             has = new VariantMetadata
             {
                 PrefixType = "pseudoclass",
                 SelectorSuffix = $":has({variantValue.Replace('_', ' ')})"
             };
         }
-        else if (variant.StartsWith("has-"))
+        else if (variant.Length > 5)
         {
             // has-hover: has-focus: etc.
 
-            var variantValue = variant.TrimStart("has-");
-
-            if (string.IsNullOrEmpty(variantValue))
-                return false;
+            var variantValue = variant[4..];
 
             if (TryVariantIsPseudoClass(variantValue, appRunner, out var pseudoClass) == false)
                 return false;
@@ -319,10 +290,6 @@ public static class VariantValidators
                 Statement = $":has({pseudoClass?.SelectorSuffix})"
             };
         }
-        else
-        {
-            return false;
-        }
 
         return true;
     }
@@ -331,150 +298,142 @@ public static class VariantValidators
     {
         supports = null;
 
-        if (variant.StartsWith("supports-", StringComparison.Ordinal) == false)
+        var indexOfSupports = variant.IndexOf("supports-", StringComparison.Ordinal);
+        
+        if (indexOfSupports == -1)
             return false;
 
-        if (variant.StartsWith("supports-["))
+        var indexOfBracket = variant.IndexOf('[');
+        var variantValue = indexOfBracket > 0
+            ? variant[(indexOfBracket + 1)..^1] 
+            : variant[0] == 'n' ? (variant[13..]) : (variant[9..]);
+        
+        if (indexOfSupports == 0)
         {
-            // supports-[display:grid]:
-
-            var variantValue = variant.TrimStart("supports-");
-
-            if (string.IsNullOrEmpty(variantValue) || variantValue.StartsWith('[') == false || variantValue.EndsWith(']') == false)
-                return false;
-
-            variantValue = variantValue.TrimStart('[').TrimEnd(']');
-            
-            supports = new VariantMetadata
+            if (indexOfBracket > 0)
             {
-                PrefixType = "supports",
-                PrefixOrder = appRunner.Library.SupportsQueryPrefixes.Count + 1,
-                Statement = $"({variantValue.Replace('_', ' ')})"
-            };
-        }
-        else if (variant.StartsWith("supports-"))
-        {
-            // supports-hover:
+                supports = new VariantMetadata
+                {
+                    PrefixType = "supports",
+                    PrefixOrder = appRunner.Library.SupportsQueryPrefixes.Count + 1,
+                    Statement = $"({variantValue.Replace('_', ' ')})"
+                };
 
-            var variantValue = variant.TrimStart("supports-");
+                return true;
+            }
 
-            if (string.IsNullOrEmpty(variantValue))
-                return false;
+            appRunner.Library.CssPropertyNamesWithColons.TryGetLongestMatchingPrefix($"{variantValue}:", out var match, out _);
 
-            var match = appRunner.Library.CssPropertyNamesWithColons.GetLongestMatchingPrefix($"{variantValue}:")?.TrimEnd(':');
-
-            if (string.IsNullOrEmpty(match))
-                return false;
-
-            supports = new VariantMetadata
+            if (string.IsNullOrEmpty(match) == false)
             {
-                PrefixType = "supports",
-                PrefixOrder = appRunner.Library.SupportsQueryPrefixes.Count + 1,
-                Statement = $"({match}: initial)"
-            };
-        }
-        else
-        {
-            return false;
+                supports = new VariantMetadata
+                {
+                    PrefixType = "supports",
+                    PrefixOrder = appRunner.Library.SupportsQueryPrefixes.Count + 1,
+                    Statement = $"({match.TrimEnd(':')}: initial)"
+                };
+
+                return true;
+            }
         }
 
-        return true;
+        if (variant[0] == 'n' && variant.StartsWith("not-", StringComparison.Ordinal))
+        {
+            if (indexOfBracket > 0)
+            {
+                supports = new VariantMetadata
+                {
+                    PrefixType = "supports",
+                    PrefixOrder = appRunner.Library.SupportsQueryPrefixes.Count + 1,
+                    Statement = $"not ({variantValue.Replace('_', ' ')})"
+                };
+
+                return true;
+            }
+
+            appRunner.Library.CssPropertyNamesWithColons.TryGetLongestMatchingPrefix($"{variantValue}:", out var match, out _);
+
+            if (string.IsNullOrEmpty(match) == false)
+            {
+                supports = new VariantMetadata
+                {
+                    PrefixType = "supports",
+                    PrefixOrder = appRunner.Library.SupportsQueryPrefixes.Count + 1,
+                    Statement = $"not ({match.TrimEnd(':')}: initial)"
+                };
+
+                return true;
+            }
+        }
+
+        return appRunner.Library.SupportsQueryPrefixes.TryGetValue(variant, out supports);
     }
 
-    public static bool TryVariantIsNotSupports(this string variant, AppRunner appRunner, out VariantMetadata? notSupports)
-    {
-        notSupports = null;
-
-        if (variant.StartsWith("not-supports-", StringComparison.Ordinal) == false)
-            return false;
-
-        if (variant.StartsWith("not-supports-["))
-        {
-            // not-supports-[display:grid]:
-
-            var variantValue = variant.TrimStart("not-supports-");
-
-            if (string.IsNullOrEmpty(variantValue) || variantValue.StartsWith('[') == false || variantValue.EndsWith(']') == false)
-                return false;
-
-            variantValue = variantValue.TrimStart('[').TrimEnd(']');
-
-            notSupports = new VariantMetadata
-            {
-                PrefixType = "not-supports",
-                PrefixOrder = appRunner.Library.SupportsQueryPrefixes.Count + 1,
-                Statement = $"not ({variantValue.Replace('_', ' ')})"
-            };
-        }
-        else if (variant.StartsWith("not-supports-"))
-        {
-            // not-supports-hover:
-
-            var variantValue = variant.TrimStart("not-supports-");
-
-            if (string.IsNullOrEmpty(variantValue))
-                return false;
-
-            var match = appRunner.Library.CssPropertyNamesWithColons.GetLongestMatchingPrefix($"{variantValue}:")?.TrimEnd(':');
-
-            if (string.IsNullOrEmpty(match))
-                return false;
-
-            notSupports = new VariantMetadata
-            {
-                PrefixType = "not-supports",
-                PrefixOrder = appRunner.Library.SupportsQueryPrefixes.Count + 1,
-                Statement = $"not ({match}: initial)"
-            };
-        }
-        else
-        {
-            return false;
-        }
-
-        return true;
-    }
-    
     public static bool TryVariantIsData(this string variant, out VariantMetadata? data)
     {
         data = null;
 
-        if (variant.StartsWith("data-", StringComparison.Ordinal) == false && variant.StartsWith("not-data-", StringComparison.Ordinal) == false)
-            return false;
-
-        if (variant.Contains("data-["))
+        if (variant[0] == 'd' && variant.StartsWith("data-", StringComparison.Ordinal))
         {
-            // data-[size=large]:
-            // not-data-[size=large]:
-
-            var variantValue = variant[variant.IndexOf('[')..];
-
-            if (string.IsNullOrEmpty(variantValue) || variantValue.StartsWith('[') == false || variantValue.EndsWith(']') == false)
-                return false;
-
-            data = new VariantMetadata
+            var bracketIndex = variant.IndexOf('[');
+            
+            if (bracketIndex > 0)
             {
-                PrefixType = "pseudoclass",
-                SelectorSuffix = variant.StartsWith("not-data-", StringComparison.Ordinal) ? $":not({variantValue.Replace('_', ' ')})" : variantValue.Replace('_', ' ')
-            };
-        }
-        else if (variant.Contains("data-"))
-        {
-            // data-active:
-            // not-data-active:
+                // data-[size=large]:
 
-            data = new VariantMetadata
+                var variantValue = variant[bracketIndex..];
+
+                data = new VariantMetadata
+                {
+                    PrefixType = "pseudoclass",
+                    SelectorSuffix = variantValue.Replace('_', ' ')
+                };
+            }
+            else
             {
-                PrefixType = "pseudoclass",
-                SelectorSuffix = variant.StartsWith("not-data-", StringComparison.Ordinal) ? $":not([{variant.TrimStart("not-")}])" : $"[{variant}]"
-            };
+                // data-active:
+
+                data = new VariantMetadata
+                {
+                    PrefixType = "pseudoclass",
+                    SelectorSuffix = $"[{variant}]"
+                };
+            }
+
+            return true;
         }
-        else
+        
+        if (variant[0] == 'n' && variant.StartsWith("not-data-", StringComparison.Ordinal))
         {
-            return false;
+            var bracketIndex = variant.IndexOf('[');
+
+            if (bracketIndex > 0)
+            {
+                // data-[size=large]:
+
+                var variantValue = variant[bracketIndex..];
+
+                data = new VariantMetadata
+                {
+                    PrefixType = "pseudoclass",
+                    SelectorSuffix = $":not({variantValue.Replace('_', ' ')})"
+                };
+            }
+            else
+            {
+                // data-active:
+
+                data = new VariantMetadata
+                {
+                    PrefixType = "pseudoclass",
+                    SelectorSuffix = $":not([{variant.TrimStart("not-")}])"
+                };
+            }
+            
+            return true;
         }
 
-        return true;
+        return false;
     }
     
     public static bool TryVariantIsCustom(this string variant, AppRunner appRunner, out VariantMetadata? custom)
@@ -545,6 +504,4 @@ public static class VariantValidators
         
         return true;
     }
-    
-    #endregion
 }

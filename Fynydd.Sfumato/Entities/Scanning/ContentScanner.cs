@@ -4,27 +4,32 @@ public static class ContentScanner
 {
     #region File Parsing Methods
     
-    public static Dictionary<string,CssClass> ScanFileForUtilityClasses(string fileContent, AppRunner appRunner, bool fromRazorFile = false)
+    public static Dictionary<string, CssClass> ScanFileForUtilityClasses(string fileContent, AppRunner appRunner, bool fromRazorFile = false)
     {
         if (string.IsNullOrEmpty(fileContent))
             return [];
         
-        var quotedSubstrings = new HashSet<string>(StringComparer.Ordinal);
         var sb = appRunner.AppState.StringBuilderPool.Get();
+        var quotedSubstrings = new HashSet<string>(StringComparer.Ordinal);
 
-        fileContent.ScanQuotedStrings(quotedSubstrings, sb);
+        try
+        {
+            fileContent.ScanForUtilities(quotedSubstrings, sb);
 
-        appRunner.AppState.StringBuilderPool.Return(sb);
-        
-        var results = new Dictionary<string,CssClass>(StringComparer.Ordinal);
-        
-        foreach (var quotedSubstring in quotedSubstrings)
-            ScanStringForClasses(quotedSubstring, results, appRunner, fromRazorFile);
-        
-        return results;
+            var results = new Dictionary<string, CssClass>(StringComparer.Ordinal);
+
+            foreach (var quotedSubstring in quotedSubstrings)
+                ScanStringForClasses(quotedSubstring, results, appRunner, fromRazorFile);
+
+            return results;
+        }
+        finally
+        {
+            appRunner.AppState.StringBuilderPool.Return(sb);
+        }
     }
 
-    private static void ScanStringForClasses(string quotedString, Dictionary<string,CssClass> results, AppRunner appRunner, bool fromRazorFile)
+    private static void ScanStringForClasses(string quotedString, Dictionary<string, CssClass> results, AppRunner appRunner, bool fromRazorFile)
     {
         foreach (var substring in quotedString.SplitByNonWhitespace())
         {

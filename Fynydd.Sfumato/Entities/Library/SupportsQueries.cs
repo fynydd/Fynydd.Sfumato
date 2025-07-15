@@ -2,7 +2,7 @@ namespace Fynydd.Sfumato.Entities.Library;
 
 public static class LibrarySupportsQueries
 {
-    public static Dictionary<string, VariantMetadata> SupportsQueryPrefixes { get; } = new()
+    public static PrefixTrie<VariantMetadata> SupportsQueryPrefixes { get; } = new()
 	{
 		{
 			"supports-",
@@ -13,6 +13,15 @@ public static class LibrarySupportsQueries
 	            Statement = "({0})"
 	        }
         },
+		{
+			"not-supports-",
+			new VariantMetadata
+			{
+				PrefixOrder = 1,
+				PrefixType = "supports",
+				Statement = "not ({0})"
+			}
+		},
 		{
 			"supports-backdrop-blur",
 	        new VariantMetadata
