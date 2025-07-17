@@ -39,6 +39,8 @@ public sealed class Library
 
     public PrefixTrie<VariantMetadata> PseudoclassPrefixes { get; } = new();
 
+    public PrefixTrie<VariantMetadata> AllVariants { get; } = new();
+
     public readonly string[] ColorSpaces = ["srgb-linear", "display-p3", "a98-rgb", "prophoto-rgb", "rec2020", "oklab", "xyz-d50", "xyz-d65", "xyz", "hsl", "hwb", "lch", "lab"];
     
     #endregion
@@ -94,7 +96,7 @@ public sealed class Library
     {
         foreach (var kvp in LibraryMediaQueries.MediaQueryPrefixes)
             MediaQueryPrefixes.Add(kvp.Key, kvp.Value);
-        
+
         foreach (var kvp in LibrarySupportsQueries.SupportsQueryPrefixes)
             SupportsQueryPrefixes.Add(kvp.Key, kvp.Value);
 
@@ -106,17 +108,13 @@ public sealed class Library
 
         foreach (var kvp in LibraryPseudoClasses.PseudoclassPrefixes)
             PseudoclassPrefixes.Add(kvp.Key, kvp.Value);
-        
+
         foreach (var pseudoClass in PseudoclassPrefixes.ToDictionary(StringComparer.Ordinal))
         {
             if (pseudoClass.Key.StartsWith('*'))
                 continue;
 
-            PseudoclassPrefixes.Add($"not-{pseudoClass.Key}", new VariantMetadata
-            {
-                PrefixType = pseudoClass.Value.PrefixType,
-                SelectorSuffix = $":not({pseudoClass.Value.SelectorSuffix})"
-            });
+            PseudoclassPrefixes.Add($"not-{pseudoClass.Key}", pseudoClass.Value.CreateNewVariant(pseudoClass.Value.PrefixType, suffix: $":not({pseudoClass.Value.SelectorSuffix})"));
         }
         
         foreach (var propertyName in ValidSafariCssPropertyNames)
@@ -186,6 +184,8 @@ public sealed class Library
         }        
     }
 
+    #region Exports
+    
     public string ExportUtilityClassDefinitions(AppRunner appRunner)
     {
         var exportItems = new List<ExportItem>();
@@ -194,7 +194,7 @@ public sealed class Library
             .Where(t => typeof(ClassDictionaryBase).IsAssignableFrom(t) && t is { IsClass: true, IsAbstract: false })
             .OrderBy(t => t.AssemblyQualifiedName)
             .ToList();
-        var groups = new PrefixTrie<string>();
+        var groups = new Dictionary<string,string>();
 
         foreach (var type in derivedTypes)
         {
@@ -623,7 +623,7 @@ public sealed class Library
 
     public string ExportColorDefinitions(AppRunner appRunner)
     {
-        var json = JsonSerializer.Serialize(appRunner.Library.ColorsByName, Jso);
+        var json = JsonSerializer.Serialize(appRunner.Library.ColorsByName.ToDictionary(), Jso);
 
         return json;
     }
@@ -635,12 +635,13 @@ public sealed class Library
         return json;
     }
 
-    public string ExportVariants(AppRunner appRunner)
+    public string ExportVariants()
     {
-        var variants = new PrefixTrie<VariantMetadata>();
-        
-        variants.AddRange(PseudoclassPrefixes);
+        var variants = new Dictionary<string, VariantMetadata>();
 
+        PseudoclassPrefixes.Remove("data-");
+        PseudoclassPrefixes.Remove("not-data-");
+        
         variants.TryAdd("data-*, data-[]", new VariantMetadata
         {
             PrefixType = "pseudoclass",
@@ -653,6 +654,7 @@ public sealed class Library
             SelectorSuffix = ":not([data-*]) /* data attribute does not exist */"
         });
 
+        variants.AddRange(PseudoclassPrefixes);
         variants.AddRange(MediaQueryPrefixes);
         variants.AddRange(SupportsQueryPrefixes);
         variants.AddRange(StartingStyleQueryPrefixes);
@@ -676,4 +678,6 @@ public sealed class Library
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
+    
+    #endregion
 }
