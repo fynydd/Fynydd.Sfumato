@@ -1,12 +1,10 @@
 namespace Fynydd.Sfumato.Tests.UtilityClasses.Borders;
 
-public class OutlineWidthTests(ITestOutputHelper testOutputHelper)
+public class OutlineWidthTests(ITestOutputHelper testOutputHelper) : SharedTestBase(testOutputHelper)
 {
     [Fact]
     public void OutlineWidth()
     {
-        var appRunner = new AppRunner(new AppState());
-
         var testClasses = new List<TestClass>()
         {
             new()
@@ -97,7 +95,7 @@ public class OutlineWidthTests(ITestOutputHelper testOutputHelper)
 
         foreach (var test in testClasses)
         {
-            var cssClass = new CssClass(appRunner, test.ClassName);
+            var cssClass = new CssClass(AppRunner, selector: test.ClassName);
 
             Assert.NotNull(cssClass);
             Assert.Equal(test.IsValid, cssClass.IsValid);
@@ -105,7 +103,7 @@ public class OutlineWidthTests(ITestOutputHelper testOutputHelper)
             Assert.Equal(test.EscapedClassName, cssClass.EscapedSelector);
             Assert.Equal(test.Styles, cssClass.Styles);
 
-            testOutputHelper.WriteLine($"{GetType().Name} => {test.ClassName}");
+            TestOutputHelper?.WriteLine($"{GetType().Name} => {test.ClassName}");
         }
     }
 }

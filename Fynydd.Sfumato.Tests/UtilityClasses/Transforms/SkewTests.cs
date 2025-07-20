@@ -1,12 +1,10 @@
 namespace Fynydd.Sfumato.Tests.UtilityClasses.Transforms;
 
-public class SkewTests(ITestOutputHelper testOutputHelper)
+public class SkewTests(ITestOutputHelper testOutputHelper) : SharedTestBase(testOutputHelper)
 {
     [Fact]
     public void Skew()
     {
-        var appRunner = new AppRunner(new AppState());
-        
         var testClasses = new List<TestClass>()
         {
             new ()
@@ -204,7 +202,7 @@ public class SkewTests(ITestOutputHelper testOutputHelper)
 
         foreach (var test in testClasses)
         {
-            var cssClass = new CssClass(appRunner, test.ClassName);
+            var cssClass = new CssClass(AppRunner, selector: test.ClassName);
 
             Assert.NotNull(cssClass);
             Assert.Equal(test.IsValid, cssClass.IsValid);
@@ -212,7 +210,7 @@ public class SkewTests(ITestOutputHelper testOutputHelper)
             Assert.Equal(test.EscapedClassName, cssClass.EscapedSelector);
             Assert.Equal(test.Styles, cssClass.Styles);
 
-            testOutputHelper.WriteLine($"{GetType().Name} => {test.ClassName}");
+            TestOutputHelper?.WriteLine($"{GetType().Name} => {test.ClassName}");
         }
     }
 }

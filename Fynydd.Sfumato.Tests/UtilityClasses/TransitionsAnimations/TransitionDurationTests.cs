@@ -1,12 +1,10 @@
 namespace Fynydd.Sfumato.Tests.UtilityClasses.TransitionsAnimations;
 
-public class TransitionDurationTests(ITestOutputHelper testOutputHelper)
+public class TransitionDurationTests(ITestOutputHelper testOutputHelper) : SharedTestBase(testOutputHelper)
 {
     [Fact]
     public void TransitionDuration()
     {
-        var appRunner = new AppRunner(new AppState());
-        
         var testClasses = new List<TestClass>()
         {
             new ()
@@ -61,7 +59,7 @@ public class TransitionDurationTests(ITestOutputHelper testOutputHelper)
 
         foreach (var test in testClasses)
         {
-            var cssClass = new CssClass(appRunner, test.ClassName);
+            var cssClass = new CssClass(AppRunner, selector: test.ClassName);
 
             Assert.NotNull(cssClass);
             Assert.Equal(test.IsValid, cssClass.IsValid);
@@ -69,7 +67,7 @@ public class TransitionDurationTests(ITestOutputHelper testOutputHelper)
             Assert.Equal(test.EscapedClassName, cssClass.EscapedSelector);
             Assert.Equal(test.Styles, cssClass.Styles);
 
-            testOutputHelper.WriteLine($"{GetType().Name} => {test.ClassName}");
+            TestOutputHelper?.WriteLine($"{GetType().Name} => {test.ClassName}");
         }
     }
 }

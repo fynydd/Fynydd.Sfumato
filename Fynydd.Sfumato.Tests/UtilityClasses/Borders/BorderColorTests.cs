@@ -1,12 +1,10 @@
 namespace Fynydd.Sfumato.Tests.UtilityClasses.Borders;
 
-public class BorderColorTests(ITestOutputHelper testOutputHelper)
+public class BorderColorTests(ITestOutputHelper testOutputHelper) : SharedTestBase(testOutputHelper)
 {
     [Fact]
     public void BorderColor()
     {
-        var appRunner = new AppRunner(new AppState());
-
         var testClasses = new List<TestClass>();
 
         foreach (var border in Entities.UtilityClasses.Borders.BorderColor.BorderColors)
@@ -73,7 +71,7 @@ public class BorderColorTests(ITestOutputHelper testOutputHelper)
 
         foreach (var test in testClasses)
         {
-            var cssClass = new CssClass(appRunner, test.ClassName);
+            var cssClass = new CssClass(AppRunner, selector: test.ClassName);
 
             Assert.NotNull(cssClass);
             Assert.Equal(test.IsValid, cssClass.IsValid);
@@ -81,7 +79,7 @@ public class BorderColorTests(ITestOutputHelper testOutputHelper)
             Assert.Equal(test.EscapedClassName, cssClass.EscapedSelector);
             Assert.Equal(test.Styles, cssClass.Styles);
 
-            testOutputHelper.WriteLine($"{GetType().Name} => {test.ClassName}");
+            TestOutputHelper?.WriteLine($"{GetType().Name} => {test.ClassName}");
         }
     }
 }

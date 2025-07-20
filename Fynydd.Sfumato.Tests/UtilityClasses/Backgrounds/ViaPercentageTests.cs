@@ -2,13 +2,11 @@
 
 namespace Fynydd.Sfumato.Tests.UtilityClasses.Backgrounds;
 
-public class ViaPercentageTests(ITestOutputHelper testOutputHelper)
+public class ViaPercentageTests(ITestOutputHelper testOutputHelper) : SharedTestBase(testOutputHelper)
 {
     [Fact]
     public void ViaPercentage()
     {
-        var appRunner = new AppRunner(new AppState());
-        
         var testClasses = new List<TestClass>()
         {
             new ()
@@ -59,7 +57,7 @@ public class ViaPercentageTests(ITestOutputHelper testOutputHelper)
 
         foreach (var test in testClasses)
         {
-            var cssClass = new CssClass(appRunner, test.ClassName);
+            var cssClass = new CssClass(AppRunner, selector: test.ClassName);
 
             Assert.NotNull(cssClass);
             Assert.Equal(test.IsValid, cssClass.IsValid);
@@ -67,7 +65,7 @@ public class ViaPercentageTests(ITestOutputHelper testOutputHelper)
             Assert.Equal(test.EscapedClassName, cssClass.EscapedSelector);
             Assert.Equal(test.Styles, cssClass.Styles);
 
-            testOutputHelper.WriteLine($"{GetType().Name} => {test.ClassName}");
+            TestOutputHelper?.WriteLine($"{GetType().Name} => {test.ClassName}");
         }
     }
 }

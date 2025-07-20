@@ -576,7 +576,7 @@ public static partial class Strings
 	/// matching braces even if there are nested blocks inside.
 	/// </summary>
 	/// <param name="content">Source CSS</param>
-	/// <param name="cssBlockDeclaration">Set as block declaration value like "@media (prefers-color-scheme: dark) {"</param>
+	/// <param name="cssBlockDeclaration">Set as a block declaration value like "@media (prefers-color-scheme: dark) {"</param>
 	public static IEnumerable<string> FindMediaBlocks(this string? content, string cssBlockDeclaration)
 	{
 		if (string.IsNullOrEmpty(content))
@@ -587,7 +587,7 @@ public static partial class Strings
 
 		while (true)
 		{
-			// Find the next css block declaration start
+			// Find the next CSS block declaration start
 			var startIdx = content.IndexOf(cssBlockDeclaration, searchPos, StringComparison.Ordinal);
 
 			if (startIdx == -1)
@@ -635,8 +635,9 @@ public static partial class Strings
 	/// </summary>
 	/// <param name="source"></param>
 	/// <param name="bag"></param>
+	/// <param name="scannerClassNamePrefixes"></param>
 	/// <param name="sb"></param>
-	public static void ScanForUtilities(this string? source, HashSet<string>? bag, StringBuilder? sb = null)
+	public static void ScanForUtilities(this string? source, Dictionary<string,string?>? bag, PrefixTrie<object?> scannerClassNamePrefixes, StringBuilder? sb = null)
 	{
 	    if (bag is null || string.IsNullOrEmpty(source))
 	        return;
@@ -660,13 +661,13 @@ public static partial class Strings
 	    var splits = sb.ToString().SplitByNonWhitespace();
 
 	    foreach (var segment in splits)
-	        ProcessSubstrings(segment, bag);
+	        ProcessSubstrings(segment, bag, scannerClassNamePrefixes);
 	}
 
 	private static readonly char[] Delimiters = ['\"', '\'', '`'];
 	private const char DoubleQuote = '\"';
 
-	public static void ProcessSubstrings(this string source, HashSet<string> bag)
+	public static void ProcessSubstrings(this string source, Dictionary<string,string?> bag, PrefixTrie<object?> scannerClassNamePrefixes)
 	{
 	    // Early exit for empty strings
 	    if (string.IsNullOrEmpty(source))
@@ -699,8 +700,8 @@ public static partial class Strings
 	    var quoteIndex = trimmedSource.IndexOf(DoubleQuote);
 	    var addSource = quoteIndex == -1 || quoteIndex != trimmedSource.LastIndexOf(DoubleQuote);
 
-	    if (addSource && trimmedSource.IsLikelyUtilityClass())
-	        bag.Add(trimmedSource);
+	    if (addSource && trimmedSource.IsLikelyUtilityClass(scannerClassNamePrefixes, out var prefix))
+	        bag.TryAdd(trimmedSource, prefix);
 
 	    // Check each delimiter once
 	    for (var d = 0; d < Delimiters.Length; d++)
@@ -717,7 +718,7 @@ public static partial class Strings
 	            continue;
 	            
 	        foreach (var subsegment in subsegments)
-	            ProcessSubstrings(subsegment, bag);
+	            ProcessSubstrings(subsegment, bag, scannerClassNamePrefixes);
 	        
 	        // Exit after first delimiter found and processed
 	        break;
@@ -735,43 +736,33 @@ public static partial class Strings
 	/// Runs in a single pass over the string and does
 	/// no heap allocations.
 	/// </summary>
-	public static bool IsLikelyUtilityClass(this string source)
+	public static bool IsLikelyUtilityClass(this string source, PrefixTrie<object?> scannerClassNamePrefixes, out string? prefix)
 	{
+		prefix = null;
+		
 		if (source.Length < 3)
 			return false;
 
-		// ---- 1. First-character gate -----------------------------------------
-		var first = source[0];
-
-		if (first is >= 'a' and <= 'z' or '[' or '-' or '@' or '*' == false)
+		if (source.IndexOf("=\"", StringComparison.Ordinal) > 0)
 			return false;
 
-		// ---- 2. Last-character gate ------------------------------------------
-		var last = source[^1];
+		var lastSegment = source.IndexOf(':') > 0 ? source.LastByTopLevel(':') ?? source : source[^1] == '!' ? source[..^1] : source; 
 
-		if (last is >= 'a' and <= 'z' or >= '0' and <= '9' or '%' or '!' or ']' or ')' == false)
+		if (lastSegment[0] == '[')
+			return true;
+		
+		var slashIndex = lastSegment.IndexOf('/');
+			
+		if (scannerClassNamePrefixes.TryGetLongestMatchingPrefix(slashIndex > -1 ? lastSegment[..slashIndex] : lastSegment, out prefix, out _) == false)
 			return false;
 
-		// ---- 3. Balanced-bracket scan (single pass) --------------------------
-		var square = 0;
-		var paren  = 0;
+		if (source[^1] == ':')
+			return false;
 
-		// `for` is ~20–25 % faster than `foreach` on strings
-		for (var i = 0; i < source.Length; i++)
-		{
-			var c = source[i];
+		if (lastSegment[^1] is >= 'a' and <= 'z' || lastSegment[^1] is >= '0' and <= '9' || lastSegment[^1] == ']' || lastSegment[^1] == ')' || lastSegment[^1] == '%')
+			return true;
 
-			// Count and allow early bail-out when the balance goes negative
-			switch (c)
-			{
-				case '[': ++square; break;
-				case ']': if (--square < 0) return false; break;
-				case '(': ++paren; break;
-				case ')': if (--paren < 0) return false; break;
-			}
-		}
-
-		return square == 0 && paren == 0;
+		return false;
 	}
 
 	/// <summary>
@@ -2020,23 +2011,38 @@ public static partial class Strings
 	/// Formats the elapsed time in the most appropriate unit:
 	/// seconds (s), milliseconds (ms), or microseconds (μs).
 	/// </summary>
-	public static string FormatTimer(this Stopwatch timer)
+	public static string FormatTimer(this TimeSpan timeSpan)
 	{
-		var elapsed = timer.Elapsed;
+		if (timeSpan.TotalNanoseconds < 1000)
+			return $"{timeSpan.TotalNanoseconds:0} ns";
+		
+		if (timeSpan.TotalMicroseconds < 1000)
+			return $"{timeSpan.TotalMicroseconds:0} μs";
+		
+		if (timeSpan.TotalMilliseconds < 1000)
+			return $"{timeSpan.TotalMilliseconds:0} ms";
 
-		if (elapsed.TotalSeconds >= 1)
-			return $"{elapsed.TotalSeconds:0}s";
+		if (timeSpan.TotalSeconds < 60)
+			return $"{timeSpan.TotalSeconds:N3} s";
 
-		if (elapsed.TotalMilliseconds >= 1)
-			return $"{elapsed.TotalMilliseconds:0}ms";
-
-		// TimeSpan.Ticks are in 100-nanosecond units. 
-		// 1 microsecond = 1,000 nanoseconds = 10 ticks.
-		var microseconds = elapsed.Ticks / 10.0;
-
-		return $"{microseconds:0}μs";
+		return $"{timeSpan.Hours:0}:{timeSpan.Minutes:00}:{timeSpan.Seconds:00}.{timeSpan.Milliseconds:000} s";
 	}
-	
+
+	/// <summary>
+	/// Formats the elapsed time in the most appropriate unit:
+	/// seconds (s), milliseconds (ms), microseconds (μs), or nanoseconds (ns).
+	/// </summary>
+	public static string FormatTimerFromNanoseconds(this double nanoseconds)
+	{
+		if (nanoseconds < 1_000d)
+			return $"{nanoseconds:0} ns";
+		
+		if (nanoseconds < 1_000_000d)
+			return $"{nanoseconds / 1_000:0} μs";
+		
+		return nanoseconds < 1_000_000_000d ? $"{nanoseconds / 1_000_000:0} ms" : $"{nanoseconds / 1_000_000_000:N3} s";
+	}
+
 	#endregion
     
     #region Console

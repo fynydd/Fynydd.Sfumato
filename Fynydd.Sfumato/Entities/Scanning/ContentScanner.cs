@@ -9,35 +9,32 @@ public static class ContentScanner
         if (string.IsNullOrEmpty(fileContent))
             return [];
         
-        var sb = appRunner.AppState.StringBuilderPool.Get();
-        var quotedSubstrings = new HashSet<string>(StringComparer.Ordinal);
+        var sb = appRunner.StringBuilderPool.Get();
+        var bag = new Dictionary<string,string?>(StringComparer.Ordinal);
 
         try
         {
-            fileContent.ScanForUtilities(quotedSubstrings, sb);
+            fileContent.ScanForUtilities(bag, appRunner.Library.ScannerClassNamePrefixes, sb);
 
             var results = new Dictionary<string, CssClass>(StringComparer.Ordinal);
 
-            foreach (var quotedSubstring in quotedSubstrings)
-                ScanStringForClasses(quotedSubstring, results, appRunner, fromRazorFile);
+            foreach (var kvp in bag)
+                appRunner.ScanStringForClasses(kvp, results, fromRazorFile);
 
             return results;
         }
         finally
         {
-            appRunner.AppState.StringBuilderPool.Return(sb);
+            appRunner.StringBuilderPool.Return(sb);
         }
     }
 
-    private static void ScanStringForClasses(string quotedString, Dictionary<string, CssClass> results, AppRunner appRunner, bool fromRazorFile)
+    private static void ScanStringForClasses(this AppRunner appRunner, KeyValuePair<string,string?> kvp, Dictionary<string, CssClass> results, bool fromRazorFile)
     {
-        foreach (var substring in quotedString.SplitByNonWhitespace())
-        {
-            var cssClass = new CssClass(appRunner, substring, fromRazorFile);
-            
-            if (cssClass.IsValid)
-                results.TryAdd(substring, cssClass);
-        }
+        var cssClass = new CssClass(appRunner, selector: kvp.Key, fromRazorFile: fromRazorFile, prefix: kvp.Value);
+        
+        if (cssClass.IsValid)
+            results.TryAdd(kvp.Key, cssClass);
     }
     
     #endregion

@@ -2,8 +2,10 @@ using Fynydd.Sfumato.Entities.Trie;
 
 namespace Fynydd.Sfumato.Tests;
 
-public class ContentScannerTests(ITestOutputHelper testOutputHelper)
+public class ContentScannerTests(ITestOutputHelper testOutputHelper) : SharedTestBase(testOutputHelper)
 {
+    #region Constants
+
     private static string Markup => """
                                     <!DOCTYPE html>
                                     <html lang="en" class="nth-[3n_+_1]:text-base bg-[url(/media/ze0liffq/alien-world.jpg?width=1920&quality=90)] [content:'arbitrary_test'] font-sans">
@@ -63,11 +65,11 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         "bg-[url(/media/ze0liffq/alien-world.jpg?width=1920&quality=90)]",
         "[content:'arbitrary_test']",
         "font-sans",
-        "arbitrary_test",
-        "viewport",
-        "initial-scale=1",
-        "stylesheet",
-        "css/sfumato.css",
+        //"arbitrary_test",
+        //"viewport",
+        //"initial-scale=1",
+        //"stylesheet",
+        //"css/sfumato.css",
         "@container",
         "content-['test']",
         "content-['']",
@@ -76,8 +78,8 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         "xl:text-base/[3rem]",
         "dark:text-base/5",
         "[-webkit-backdrop-filter:blur(1rem)]",
-        "test",
-        "test-home",
+        //"test",
+        //"test-home",
         "@max-md:flex-col",
         "text-[1rem]",
         "lg:text-[1.25rem]",
@@ -85,7 +87,7 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         "bg-fuchsia-500",
         "dark:sm:bg-fuchsia-300",
         "dark:text-[length:1rem]",
-        "xl:text-[#112233]",
+        //"xl:text-[#112233]",
         "xl:text-[red]",
         "xl:text-[--my-color-var]",
         "xl:text-[var(--my-color-var)]",
@@ -93,7 +95,6 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         "sm:[font-weight:900]",
         "[fontweight:400]",
         "sm:[fontweight:300]",
-        "xl:text[#112233]",
         "xl:text-slate[#112233]",
         "xl:text-slate-50[#112233]",
         "xxl:text-slate-50-[#112233]",
@@ -113,13 +114,13 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         "top-1/2",
         "antialiased",
         "select-none",
-        "@(childUrl)",
-        "category.Slug",
-        "selectedClasses",
+        //"@(childUrl)",
+        //"category.Slug",
+        //"selectedClasses",
         "pl-4",
         "-ml-px",
         "border-l",
-        "test-element",
+        //"test-element",
         "bg-emerald-900",
         "[font-weight:700]",
         "md:[font-weight:700]",
@@ -130,8 +131,8 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         "bg-slate-400",
         "text-9xl",
         "content-[\"test2\"]",
-        "test2",
-        "iconClass",
+        //"test2",
+        //"iconClass",
         "mr-2.5",
         "line-clamp-1",
         "-mt-1!",
@@ -152,6 +153,7 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         "@container",
         "content-['test']",
         "content-['']",
+        //"content-[",
         "phab:hover:text-xs",
         "xl:text-base/[3rem]",
         "dark:text-base/5",
@@ -207,8 +209,6 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         "mb-1.5"
     ];
 
-    #region Constants
-
     private static string Css => """
                                  :root {
                                      --my-prop-var: 1.25rem;
@@ -227,39 +227,39 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
                                      top: --spacing(4);
                                  }
                                  """;
+    
     #endregion
 
     [Fact]
     public void StringScanning()
     {
-        var quotedSubstrings = new HashSet<string>(StringComparer.Ordinal);
+        var quotedSubstrings = new Dictionary<string,string?>(StringComparer.Ordinal);
 
-        Markup.ScanForUtilities(quotedSubstrings);
-
-        foreach (var substring in ExpectedMatches)
-            if (quotedSubstrings.Contains(substring) == false)
-                testOutputHelper.WriteLine($"NOT FOUND: `{substring}`");
+        Markup.ScanForUtilities(quotedSubstrings, AppRunner.Library.ScannerClassNamePrefixes);
 
         foreach (var substring in ExpectedMatches)
-            if (quotedSubstrings.Contains(substring) == false)
+            if (quotedSubstrings.ContainsKey(substring) == false)
+                TestOutputHelper?.WriteLine($"NOT FOUND: `{substring}`");
+
+        foreach (var substring in ExpectedMatches)
+            if (quotedSubstrings.ContainsKey(substring) == false)
                 Assert.Fail("Did not find one or more matches");
     }
     
     [Fact]
     public void FileContentParsing()
     {
-        var appRunner = new AppRunner(new AppState());
-        var utilityClasses = ContentScanner.ScanFileForUtilityClasses(Markup, appRunner, true);
+        var utilityClasses = ContentScanner.ScanFileForUtilityClasses(Markup, AppRunner, true);
 
-        testOutputHelper.WriteLine("FileContentParsing() => Found:");
-        testOutputHelper.WriteLine("");
+        TestOutputHelper?.WriteLine("FileContentParsing() => Found:");
+        TestOutputHelper?.WriteLine("");
 
         foreach (var item in ExpectedValidMatches)
             if (utilityClasses.ContainsKey(item) == false)
                 Assert.Fail($"NOT FOUND: `{item}`");
 
         foreach (var kvp in utilityClasses)
-            testOutputHelper.WriteLine($"{kvp.Value.Selector}");
+            TestOutputHelper?.WriteLine($"{kvp.Value.Selector}");
 
         Assert.Equal(ExpectedValidMatches.Count, utilityClasses.Count);
     }
@@ -267,18 +267,17 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
     [Fact]
     public async Task CssCustomPropertyScanner()
     {
-        var appRunner = new AppRunner(new AppState());
         var props = new List<string>();
         var segment = new GenerationSegment
         {
             Content = new StringBuilder(Css)
         };
 
-        appRunner.GatherSegmentCssCustomPropertyRefs(segment);
+        AppRunner.GatherSegmentCssCustomPropertyRefs(segment);
         
         foreach (var kvp in segment.UsedCssCustomProperties)
         {
-            testOutputHelper.WriteLine(kvp.Key);
+            TestOutputHelper?.WriteLine(kvp.Key);
             props.Add(kvp.Key);
         }
         
@@ -288,7 +287,7 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         
         foreach (var kvp in segment.UsedCssCustomProperties)
         {
-            testOutputHelper.WriteLine(kvp.Key + " : " + kvp.Value);
+            TestOutputHelper?.WriteLine(kvp.Key + " : " + kvp.Value);
             dict.Add(kvp.Key, kvp.Value);
         }
         
@@ -299,7 +298,7 @@ public class ContentScannerTests(ITestOutputHelper testOutputHelper)
         Assert.True(segment.Content.Contains("--alpha(var(--color-lime-500) / 15%)"));
         Assert.True(segment.Content.Contains("--spacing(4)"));
 
-        await appRunner.ProcessSegmentFunctionsAsync(segment);
+        await AppRunner.ProcessSegmentFunctionsAsync(segment);
 
         Assert.True(segment.Content.Contains("oklch(0.768 0.233 130.85 / 0.15)"));
         Assert.True(segment.Content.Contains("calc(var(--spacing) * 4)"));

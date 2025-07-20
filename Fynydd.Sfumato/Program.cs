@@ -9,13 +9,13 @@ namespace Fynydd.Sfumato;
 internal class Program
 {
 	private static readonly WeakMessenger Messenger = new ();
+	private static ObjectPool<StringBuilder> StringBuilderPool { get; } = new DefaultObjectPoolProvider().CreateStringBuilderPool();
+	private static AppState AppState { get; } = new (StringBuilderPool);
 
 	public static readonly ActionBlock<AppRunner> Dispatcher = new (appRunner => Messenger.Send(appRunner), new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 1 });
 
 	private static async Task Main(string[] args)
 	{
-		var appState = new AppState();
-
 		#region Launch SCSS (prior) version when args indicate
 
 		// args = ["watch", "--path", "/Users/magic/Developer/Fynydd-Website-2024/UmbracoCms/"];
@@ -57,10 +57,6 @@ internal class Program
 
 		#endregion
 
-		var totalTimer = new Stopwatch();
-
-		totalTimer.Start();
-		
 		Console.OutputEncoding = Encoding.UTF8;
 		
 		var version = await Identify.VersionAsync(System.Reflection.Assembly.GetExecutingAssembly());
@@ -82,15 +78,15 @@ internal class Program
 
 		// ReSharper disable once RedundantAssignment
 		var argumentErrorMessage = string.Empty;
-		
+
 #if DEBUG
-		//argumentErrorMessage = await appState.InitializeAsync(args);
-		argumentErrorMessage = await appState.InitializeAsync(["watch", "/Users/magic/Developer/Sfumato-Web/UmbracoCms/wwwroot/stylesheets/source.css"]);
+		//argumentErrorMessage = await AppState.InitializeAsync(args);
+		argumentErrorMessage = await AppState.InitializeAsync(["watch", "/Users/magic/Developer/Sfumato-Web/UmbracoCms/wwwroot/stylesheets/source.css"]);
 #else		
-        argumentErrorMessage = await appState.InitializeAsync(args);
+        argumentErrorMessage = await AppState.InitializeAsync(args);
 #endif
 
-		if (appState.VersionMode)
+		if (AppState.VersionMode)
 		{
 			await Console.Out.WriteLineAsync($"Sfumato Version {version}");
 			Environment.Exit(0);
@@ -110,21 +106,21 @@ internal class Program
 			return;
 		}
 
-		if (appState.InitMode)
+		if (AppState.InitMode)
 		{
-            var cssReferenceFile = await Storage.ReadAllTextWithRetriesAsync(Path.Combine(appState.EmbeddedCssPath, "sfumato-example.css"), Library.FileAccessRetryMs);
+            var cssReferenceFile = await Storage.ReadAllTextWithRetriesAsync(Path.Combine(Constants.EmbeddedCssPath, "sfumato-example.css"), Library.FileAccessRetryMs);
 
-			await File.WriteAllTextAsync(Path.Combine(appState.WorkingPath, "sfumato-example.css"), cssReferenceFile);
+			await File.WriteAllTextAsync(Path.Combine(Constants.WorkingPath, "sfumato-example.css"), cssReferenceFile);
 
 			await Console.Out.WriteLineAsync();
-			await Console.Out.WriteLineAsync($"Created sfumato-example.css file at {appState.WorkingPath}");
+			await Console.Out.WriteLineAsync($"Created sfumato-example.css file at {Constants.WorkingPath}");
 			await Console.Out.WriteLineAsync();
 			
 			Environment.Exit(0);
 			return;
 		}
 		
-		if (appState.HelpMode)
+		if (AppState.HelpMode)
         {
 			"""
 			Sfumato copies one or more specified source CSS files to new output files that have additional styles for all utility class references in project files._
@@ -192,9 +188,9 @@ internal class Program
 			return;
 		}
 
-		if (appState.BuildMode || appState.WatchMode)
+		if (AppState.BuildMode || AppState.WatchMode)
 		{
-			foreach (var appRunner in appState.AppRunners)
+			foreach (var appRunner in AppState.AppRunners)
 			{
 				var options =
 				(
@@ -225,14 +221,14 @@ internal class Program
 					await Console.Out.WriteLineAsync($"Ignore      :  {relativePath2}");
 				}
 
-				await Console.Out.WriteLineAsync(appRunner == appState.AppRunners.Last()
+				await Console.Out.WriteLineAsync(appRunner == AppState.AppRunners.Last()
 					? Strings.ThickLine.Repeat(Library.MaxConsoleWidth)
 					: Strings.DotLine.Repeat(Library.MaxConsoleWidth));
 			}
 
 			var tasks = new List<Task>();
 
-			foreach (var appRunner in appState.AppRunners)
+			foreach (var appRunner in AppState.AppRunners)
 			{
 				tasks.Add(appRunner.PerformFileScanAsync());
 			}
@@ -240,23 +236,18 @@ internal class Program
 			await Task.WhenAll(tasks);
 			tasks.Clear();
 
-			foreach (var appRunner in appState.AppRunners)
+			foreach (var appRunner in AppState.AppRunners)
 				tasks.Add(appRunner.FullBuildAndSaveCss());
 
 			await Task.WhenAll(tasks);
 
-			totalTimer.Stop();
-
-			// await Console.Out.WriteLineAsync($"Elapsed time {totalTimer.FormatTimer()}");
-			// await Console.Out.WriteLineAsync(Strings.ThickLine.Repeat(Library.MaxConsoleWidth));
-
-			if (appState.WatchMode)
+			if (AppState.WatchMode)
 			{
 				do
 				{
 					await Task.Delay(25);
 
-				} while (appState.AppRunners.Any(r => r.Messages.Count != 0));
+				} while (AppState.AppRunners.Any(r => r.Messages.Count != 0));
 
 				await Console.Out.WriteLineAsync("Watching; press ESC to exit");
 
@@ -295,7 +286,7 @@ internal class Program
 					}, cancellationTokenSource.Token);
 				}
 
-				foreach (var appRunner in appState.AppRunners)
+				foreach (var appRunner in AppState.AppRunners)
 					await appRunner.StartWatchingAsync();
 
 				while ((Console.IsInputRedirected || Console.KeyAvailable == false) &&
@@ -315,7 +306,7 @@ internal class Program
 
 					var performedWork = false;
 
-					foreach (var appRunner in appState.AppRunners)
+					foreach (var appRunner in AppState.AppRunners)
 					{
 						var result = await appRunner.ProcessWatchQueues();
 
@@ -329,7 +320,7 @@ internal class Program
 						{
 							await Task.Delay(25, cancellationTokenSource.Token);
 
-						} while (appState.AppRunners.Any(r => r.Messages.Count != 0));
+						} while (AppState.AppRunners.Any(r => r.Messages.Count != 0));
 
 						await Console.Out.WriteLineAsync("Watching; press ESC to exit");
 					}
@@ -353,11 +344,11 @@ internal class Program
 
 			await Console.Out.WriteLineAsync();
 
-			if (appState.WatchMode)
+			if (AppState.WatchMode)
 			{
 				await Console.Out.WriteLineAsync("Shutting down...");
 
-				foreach (var appRunner in appState.AppRunners)
+				foreach (var appRunner in AppState.AppRunners)
 					await appRunner.ShutDownWatchersAsync();
 			}
 		}

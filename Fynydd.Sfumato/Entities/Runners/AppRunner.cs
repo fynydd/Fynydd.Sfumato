@@ -6,15 +6,14 @@ public sealed class AppRunner
 {
 	#region Properties
 
-	public Stopwatch CssBuildStopwatch { get; } = new();
-	public Stopwatch FileScanStopwatch { get; } = new();
+	public ObjectPool<StringBuilder> StringBuilderPool { get; }
+
 	public string LastCss { get; set; } = string.Empty;
 	public List<string> Messages { get; } = [];
 	public bool MessagesBusy { get; set; }
 	public bool ProcessingWatchQueue { get; set; }
 	public bool IsFirstRun { get; set; } = true;
-	
-	public AppState AppState { get; }
+
 	public Library.Library Library { get; set; } = new();
 	public AppRunnerSettings AppRunnerSettings { get; set; } = new();
 	public Dictionary<string, string> UsedCssCustomProperties { get; } = new(StringComparer.Ordinal);
@@ -23,7 +22,7 @@ public sealed class AppRunner
 
 	private string _cssFilePath;
 	private readonly bool _useMinify;
-
+	
 	private List<FileSystemWatcher> FileWatchers { get; } = [];
 	public ConcurrentDictionary<string, ScannedFile> ScannedFiles { get; } = new(StringComparer.Ordinal);
 	private ConcurrentDictionary<long, FileSystemEventArgs> RestartAppQueue { get; } = [];
@@ -53,16 +52,23 @@ public sealed class AppRunner
 
 	#region Construction
 
-	public AppRunner(AppState appState, string cssFilePath = "", bool useMinify = false)
+	public AppRunner(ObjectPool<StringBuilder> stringBuilderPool)
 	{
-		AppState = appState;
+		StringBuilderPool = stringBuilderPool;
+		_cssFilePath = string.Empty;
+		_useMinify = false;
+	}
+
+	public AppRunner(ObjectPool<StringBuilder> stringBuilderPool, string cssFilePath, bool useMinify = false)
+	{
+		StringBuilderPool = stringBuilderPool;
 
 		_cssFilePath = cssFilePath;
 		_useMinify = useMinify;
 
-		BrowserResetCssSegment.Content = new StringBuilder(File.ReadAllText(Path.Combine(AppState.EmbeddedCssPath, "browser-reset.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim());
-		FormsCssSegment.Content = new StringBuilder(File.ReadAllText(Path.Combine(AppState.EmbeddedCssPath, "forms.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim());
-		DefaultsCssSegment.Content = new StringBuilder(File.ReadAllText(Path.Combine(AppState.EmbeddedCssPath, "defaults.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim());
+		BrowserResetCssSegment.Content = new StringBuilder(File.ReadAllText(Path.Combine(Constants.EmbeddedCssPath, "browser-reset.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim());
+		FormsCssSegment.Content = new StringBuilder(File.ReadAllText(Path.Combine(Constants.EmbeddedCssPath, "forms.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim());
+		DefaultsCssSegment.Content = new StringBuilder(File.ReadAllText(Path.Combine(Constants.EmbeddedCssPath, "defaults.css")).NormalizeLinebreaks(AppRunnerSettings.LineBreak).Trim());
 
 		Initialize();
 	}
@@ -161,7 +167,8 @@ public sealed class AppRunner
 	public async Task PerformFileScanAsync()
 	{
 		ScannedFiles.Clear();
-		FileScanStopwatch.Restart();
+
+		var timeStamp = Stopwatch.GetTimestamp();
 
 		// 1. Grab EVERYTHING in one streaming pass
 		var allPaths = AppRunnerSettings.AbsolutePaths
@@ -180,11 +187,12 @@ public sealed class AppRunner
 		// 3. Re-aggregate the utility-class map
 		ProcessScannedFileUtilityClassDependencies(this);
 
-		FileScanStopwatch.Stop();
+		var elapsedTicks = Stopwatch.GetTimestamp() - timeStamp;
+		var nanoseconds  = elapsedTicks * Constants.NsPerTick;
 
 		await AddMessageAsync(
 			$"Found {ScannedFiles.Count:N0} file{(ScannedFiles.Count==1?"":"s")}, " +
-			$"{UtilityClasses.Count:N0} class{(UtilityClasses.Count==1?"":"es")} in {FileScanStopwatch.FormatTimer()}"
+			$"{UtilityClasses.Count:N0} class{(UtilityClasses.Count==1?"":"es")} in {nanoseconds.FormatTimerFromNanoseconds()}"
 		);
 	}
 
@@ -240,7 +248,7 @@ public sealed class AppRunner
 
 	private async Task BuildAndSaveCss(string mode = "")
 	{
-		CssBuildStopwatch.Restart();
+		var timeStamp = Stopwatch.GetTimestamp();
 
 		LastCss = mode switch
 		{
@@ -256,9 +264,10 @@ public sealed class AppRunner
 		{
 			await File.WriteAllTextAsync(AppRunnerSettings.NativeCssOutputFilePath, LastCss);
 
-			CssBuildStopwatch.Stop();
+			var elapsedTicks = Stopwatch.GetTimestamp() - timeStamp;
+			var nanoseconds  = elapsedTicks * Constants.NsPerTick;
 
-			Messages.Add($"{LastCss.Length.FormatBytes()} written to {AppRunnerSettings.CssOutputFilePath} in {CssBuildStopwatch.FormatTimer()}");
+			Messages.Add($"{LastCss.Length.FormatBytes()} written to {AppRunnerSettings.CssOutputFilePath} in {nanoseconds.FormatTimerFromNanoseconds()}");
 			Messages.Add($"Build complete at {DateTime.Now:HH:mm:ss.fff}");
 			Messages.Add(Strings.DotLine.Repeat(Entities.Library.Library.MaxConsoleWidth));
 		}
@@ -283,7 +292,7 @@ public sealed class AppRunner
 		}
 		catch (Exception e)
 		{
-			Messages.Add($"{AppState.CliErrorPrefix}ProcessScannedFileUtilityClassDependencies() - {e.Message}");
+			Messages.Add($"{Constants.CliErrorPrefix}ProcessScannedFileUtilityClassDependencies() - {e.Message}");
 		}
 	}
     
@@ -397,6 +406,8 @@ public sealed class AppRunner
 	/// <returns>true, when work was performed</returns>
 	public async Task<bool> ProcessWatchQueues()
 	{
+		var timeStamp = 0L;
+		
 		while (ProcessingWatchQueue)
 			await Task.Delay(25);
 
@@ -527,7 +538,7 @@ public sealed class AppRunner
 				if (AppRunnerSettings.NotFolderNames.Any(s => pathOnly.Contains($"{Path.DirectorySeparatorChar}{s}{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
 					continue;
 
-				FileScanStopwatch.Restart();
+				timeStamp = Stopwatch.GetTimestamp();
 
 				// ReSharper disable once ConvertIfStatementToSwitchStatement
 				if (fcr.ChangeType is WatcherChangeTypes.Changed or WatcherChangeTypes.Created)
@@ -585,7 +596,9 @@ public sealed class AppRunner
 				
 			ProcessScannedFileUtilityClassDependencies(this);
 
-			await AddMessageAsync($"Processed changes in {FileScanStopwatch.FormatTimer()}");
+			var elapsedTime = Stopwatch.GetElapsedTime(timeStamp);
+
+			await AddMessageAsync($"Processed changes in {elapsedTime.FormatTimer()}");
 			await ProjectChangeBuildAndSaveCss();
 				
 			ProcessingWatchQueue = false;
