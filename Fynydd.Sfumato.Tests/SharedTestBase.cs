@@ -12,6 +12,7 @@ public class SharedTestBase
 
     public AppRunner AppRunner { get; protected set; }
     protected static string SampleCssFilePath => Path.GetFullPath(Path.Combine(Root, "Fynydd.Sfumato.Tests/SampleCss/sample.css"));
+    protected static string ExportCssFilePath => Path.GetFullPath(Path.Combine(Root, "Fynydd.Sfumato.Tests/Export/export.css"));
     protected static string ScanSampleFilePath => Path.GetFullPath(Path.Combine(Root, "Fynydd.Sfumato.Tests/SampleWebsite/scan-sample.html"));
     protected static string SampleWebsiteSourceFilePath => Path.GetFullPath(Path.Combine(Root, "Fynydd.Sfumato.Tests/SampleWebsite/wwwroot/stylesheets/source.css"));
 

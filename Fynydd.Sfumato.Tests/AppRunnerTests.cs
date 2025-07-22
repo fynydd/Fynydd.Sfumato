@@ -1,6 +1,3 @@
-using Fynydd.Sfumato.Tests.UtilityClasses;
-using Microsoft.DotNet.PlatformAbstractions;
-
 namespace Fynydd.Sfumato.Tests;
 
 public class AppRunnerTests : SharedTestBase
