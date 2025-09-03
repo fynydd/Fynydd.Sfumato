@@ -1,0 +1,7 @@
+﻿<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+  </Configurations>
+  <Project Path="Fynydd.Sfumato\Fynydd.Sfumato.csproj" Type="Classic C#" />
+  <Project Path="Fynydd.Sfumato.Tests\Fynydd.Sfumato.Tests.csproj" Type="Classic C#" />
+</Solution>
