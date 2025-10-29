@@ -3,7 +3,6 @@
 
 using System.Globalization;
 using System.Reflection;
-
 // ReSharper disable RedundantBoolCompare
 // ReSharper disable ConvertIfStatementToSwitchStatement
 // ReSharper disable InvertIf
@@ -37,6 +36,8 @@ public static class AppRunnerExtensions
 	    #region Read breakpoints
 
 	    var prefixOrder = 100;
+
+	    appRunner.AppRunnerSettings.BreakpointSizes.Clear();
 
 	    foreach (var match in appRunner.AppRunnerSettings.SfumatoBlockItems)
 	    {
@@ -83,6 +84,15 @@ public static class AppRunnerExtensions
 		    
 		    if (prefixOrder < int.MaxValue - 100)
 			    prefixOrder += 100;
+		    
+		    foreach (var unit in appRunner.Library.CssLengthUnits.OrderByDescending(u => u.Length))
+			    if (match.Value.EndsWith(unit))
+			    {
+				    if (double.TryParse(match.Value.TrimEnd(unit), out var value))
+					    appRunner.AppRunnerSettings.BreakpointSizes.TryAdd(key, value);
+
+				    break;
+			    }
 	    }
 	    
 	    foreach (var breakpoint in appRunner.AppRunnerSettings.SfumatoBlockItems)
@@ -216,7 +226,7 @@ public static class AppRunnerExtensions
 		    if (prefixOrder < int.MaxValue - 100)
 			    prefixOrder += 100;
 	    }
-
+	    
 	    #endregion
 	    
 	    #region Read @custom-variant shorthand items
