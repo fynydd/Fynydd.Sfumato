@@ -10,6 +10,7 @@ using Sfumato.Validators;
 using Sfumato.Entities.Runners;
 using Sfumato.Entities.Trie;
 using Sfumato.Entities.UtilityClasses;
+using System.Globalization;
 
 namespace Sfumato.Entities.CssClassProcessing;
 
@@ -105,61 +106,12 @@ public sealed class CssClass : IDisposable
 
     public bool ProcessSelectorSegments()
     {
-        IsImportant = Selector[^1] == '!';
-
-        if (Selector.IndexOf(':') > 0)
-        {
-            foreach (var segment in Selector.SplitByTopLevel(':'))
-                AllSegments.Add(segment.ToString());
-
-            return false;
-        }
-
-        var hasBrackets = Selector.IndexOfAny(['[', '(']) >= 0;
-
-        AllSegments.Add(IsImportant ? Selector[..^1] : Selector);
-
-        if (hasBrackets == false && AppRunner.Library.SimpleClasses.TryGetValue(AllSegments[0], out ClassDefinition))
-        {
-            IsValid = true;
-            SelectorSort = ClassDefinition.SelectorSort;
-
-            if (ClassDefinition.IsRazorSyntax)
-                HasRazorSyntax = true;
-            
-            GenerateSelector();
-            GenerateStyles();
-
-            return true;
-        }
-
-        return false;
+        return CssCandidateParser.TryResolveSimple(this);
     }
     
     public void Initialize()
     {
-        if (ProcessSelectorSegments())
-            return; // Exit early if a simple class with no variants is found
-        
-        ProcessArbitraryCss();
-
-        if (IsValid == false && AllSegments[^1][0] != '[')
-            ProcessUtilityClasses();
-
-        if (IsValid == false)
-            return;
-
-        if (ClassDefinition?.IsRazorSyntax ?? false)
-            HasRazorSyntax = true;
-
-        if (AllSegments.Count > 1)
-            ProcessVariants();
-
-        if (IsValid)
-            GenerateSelector();
-
-        if (IsValid)
-            GenerateWrappers();
+        CssCompiler.Compile(this);
     }
     
     #endregion
@@ -168,116 +120,17 @@ public sealed class CssClass : IDisposable
     
     public void ProcessVariants()
     {
-        try
-        {
-            if (AllSegments.Count <= 1)
-                return;
-            
-            // One or more invalid variants invalidate the entire utility class
-
-            for (var i = 0; i < AllSegments.Count - 1; i++) // skip last item
-            {
-                var segment = AllSegments[i];
-                
-                if (string.IsNullOrEmpty(segment))
-                    return;
-
-                if (segment.TryGetVariant(AppRunner, out var variantMetadata))
-                {
-                    if (variantMetadata is null)
-                        return;
-
-                    if (HasRazorSyntax == false && variantMetadata.IsRazorSyntax)
-                        HasRazorSyntax = true;
-                    
-                    VariantSegments.TryAdd(segment, variantMetadata);
-
-                    if (variantMetadata.PrefixType[0] != 'p')
-                        continue;
-                    
-                    if (variantMetadata.PrioritySort > 0)
-                        SelectorSort += variantMetadata.PrioritySort;
-                    else
-                        SelectorSort++;
-                }
-                else
-                {
-                    IsValid = false;
-                    return;
-                }
-            }
-        }
-        catch
-        {
-            // Ignored
-        }
+        CssVariantResolver.Resolve(this);
     }
     
     public void ProcessArbitraryCss()
     {
-        try
-        {
-            if (AllSegments.Count == 0)
-                return;
-
-            if (AllSegments.Last().StartsWith('[') == false || AllSegments.Last().EndsWith(']') == false)
-                return;
-            
-            var trimmedValue = AllSegments.Last().TrimStart('[').TrimEnd(']');
-            var colonIndex = trimmedValue.IndexOf(':');
-
-            if (colonIndex < 1 || colonIndex > trimmedValue.Length - 2)
-                return;
-
-            Styles = string.Empty;
-            
-            foreach (var span in trimmedValue.EnumerateCssCustomProperties())
-            {
-                // [--my-text-size:1rem]
-                IsCssCustomPropertyAssignment = true;
-                IsValid = true;
-                Styles += $"{span.Property}: {span.Value};".ProcessUnderscores();
-            }
-            
-            if (IsValid == false && AppRunner.Library.CssPropertyNamesWithColons.HasPrefixIn(trimmedValue))
-            {
-                // [font-size:1rem]
-                IsArbitraryCss = true;
-                IsValid = true;
-                Styles = $"{trimmedValue.ProcessUnderscores().TrimEnd(';')};";
-            }
-
-            if (IsValid == false || IsImportant == false)
-                return;
-            
-            if (Styles.Contains("--") == false)
-            {
-                Styles = Styles.Replace(";", " !important;", StringComparison.Ordinal);
-            }
-            else
-            {
-                var splits = Styles.Split(';', StringSplitOptions.RemoveEmptyEntries);
-
-                Styles = string.Empty;
-                    
-                foreach (var split in splits)
-                {
-                    if (split.Trim().StartsWith("--"))
-                        Styles += split.Trim() + ';' + AppRunner.AppRunnerSettings.LineBreak;
-                    else
-                        Styles += split.Trim() + " !important;" + AppRunner.AppRunnerSettings.LineBreak;
-                }
-                    
-                Styles = Styles.Trim();
-            }
-        }
-        catch
-        {
-            // Ignored
-        }
+        CssCandidateParser.ResolveArbitrary(this);
     }
     
-    public void ProcessUtilityClasses()
+    public void ProcessUtilityClasses() => CssUtilityResolver.Resolve(this);
+
+    internal void ResolveUtilityCore()
     {
         try
         {
@@ -293,16 +146,58 @@ public sealed class CssClass : IDisposable
 
             var value = AllSegments[^1].TrimStart(_prefix) ?? string.Empty;
 
+            if (AppRunner.Library.FunctionalClasses.Count > 0 && AppRunner.Library.FunctionalClasses.TryGetValue(_prefix, out var functionalUtilities))
+            {
+                var stylesBuilder = AppRunner.StringBuilderPool.Get();
+
+                try
+                {
+                    for (var index = 0; index < functionalUtilities.Count; index++)
+                    {
+                        if (functionalUtilities[index].TryResolve(value, AppRunner, out var resolvedStyles) == false)
+                            continue;
+
+                        if (stylesBuilder.Length > 0)
+                            stylesBuilder.Append(AppRunner.AppRunnerSettings.LineBreak);
+
+                        stylesBuilder.Append(resolvedStyles);
+                    }
+
+                    if (stylesBuilder.Length > 0)
+                    {
+                        ClassDefinition = new ClassDefinition
+                        {
+                            InSimpleUtilityCollection = true,
+                            Template = stylesBuilder.ToString(),
+                        };
+                        IsValid = true;
+                        GenerateStyles();
+                    }
+                }
+                finally
+                {
+                    AppRunner.StringBuilderPool.Return(stylesBuilder);
+                }
+
+                return;
+            }
+
             if (value.Contains('/'))
             {
-                var slashSegments = new List<string>();
-                
-                foreach (var segment in value.SplitByTopLevel('/'))
-                    slashSegments.Add(segment.ToString());
+                var slashCount = 0;
+                var modifier = string.Empty;
 
-                if (slashSegments.Count == 2)
+                foreach (var segment in value.SplitByTopLevel('/'))
                 {
-                    ModifierValue = slashSegments[^1];
+                    if (slashCount == 1)
+                        modifier = segment.ToString();
+
+                    slashCount++;
+                }
+
+                if (slashCount == 2)
+                {
+                    ModifierValue = modifier;
                     value = value.TrimEnd($"/{ModifierValue}") ?? string.Empty;
                     HasArbitraryModifierValue = ModifierValue.StartsWith('[');
                     ModifierValue = ModifierValue.TrimStart('[').TrimEnd(']');
@@ -332,6 +227,12 @@ public sealed class CssClass : IDisposable
             {
                 if (AppRunner.Library.SimpleClasses.TryGetValue(_prefix, out ClassDefinition))
                 {
+                    if (HasModifierValue && ClassDefinition.HasBehavior(UtilityBehaviors.SlashModifier) == false)
+                    {
+                        ClassDefinition = null;
+                        return;
+                    }
+
                     IsValid = true;
                     SelectorSort = ClassDefinition.SelectorSort;
 
@@ -348,22 +249,24 @@ public sealed class CssClass : IDisposable
 
             #region Handle Fractions/Ratios
             
-            if (HasArbitraryValue == false && HasArbitraryValueWithCssCustomProperty == false && HasModifierValue && int.TryParse(value, out var numerator) && int.TryParse(ModifierValue, out var denominator))
+            if (HasArbitraryValue == false && HasArbitraryValueWithCssCustomProperty == false && HasModifierValue && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var numerator) && double.TryParse(ModifierValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var denominator))
             {
-                if (denominator != 0)
+                if (denominator != 0 && IsValidFractionPart(value, numerator) && IsValidFractionPart(ModifierValue, denominator))
                 {
                     if (AppRunner.Library.RatioClasses.TryGetValue(_prefix, out ClassDefinition))
                     {
-                        if (ClassDefinition.UsesSlashModifier == false)
-                            Value = $"{numerator} / {denominator}";
+                        if (ClassDefinition.HasBehavior(UtilityBehaviors.SlashModifier) == false)
+                            Value = $"{value} / {ModifierValue}";
                     }
                     else if (AppRunner.Library.LengthClasses.TryGetValue(_prefix, out ClassDefinition) || AppRunner.Library.PercentageClasses.TryGetValue(_prefix, out ClassDefinition))
                     {
-                        if (ClassDefinition.UsesSlashModifier == false)
-                            Value = $"{(double)numerator / denominator * 100:0.############}%";
+                        if (ClassDefinition.HasBehavior(UtilityBehaviors.DisallowFractions))
+                            ClassDefinition = null;
+                        else if (ClassDefinition.HasBehavior(UtilityBehaviors.SlashModifier) == false)
+                            Value = $"{((double)numerator / denominator * 100).ToString("0.############", CultureInfo.InvariantCulture)}%";
                     }
 
-                    if (ClassDefinition?.UsesSlashModifier ?? false)
+                    if (ClassDefinition?.HasBehavior(UtilityBehaviors.SlashModifier) ?? false)
                     {
                         ClassDefinition = null;
                     }
@@ -387,73 +290,36 @@ public sealed class CssClass : IDisposable
             if (HasArbitraryValueWithCssCustomProperty && ClassDefinition is null)
             {
                 var valueNoBrackets = value.TrimStart('[').TrimStart('(').TrimEnd(')').TrimEnd(']').ProcessUnderscores();
+                var typeSeparator = valueNoBrackets.IndexOf(':');
+                var valueKind = typeSeparator < 0
+                    ? UtilityValueKinds.Abstract
+                    : valueNoBrackets.AsSpan(0, typeSeparator) switch
+                    {
+                        "dimension" or "length" => UtilityValueKinds.Length,
+                        "color" => UtilityValueKinds.Color,
+                        "integer" => UtilityValueKinds.Integer,
+                        "percentage" => UtilityValueKinds.Percentage,
+                        "alpha" or "number" => UtilityValueKinds.Number,
+                        "image" or "url" => UtilityValueKinds.Url,
+                        "angle" or "hue" => UtilityValueKinds.Angle,
+                        "duration" or "time" => UtilityValueKinds.Duration,
+                        "flex" => UtilityValueKinds.Flex,
+                        "frequency" => UtilityValueKinds.Frequency,
+                        "ratio" => UtilityValueKinds.Ratio,
+                        "resolution" => UtilityValueKinds.Resolution,
+                        "string" => UtilityValueKinds.String,
+                        _ => UtilityValueKinds.Abstract,
+                    };
 
-                if (valueNoBrackets.StartsWith("dimension:", StringComparison.Ordinal) || valueNoBrackets.StartsWith("length:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.LengthClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("color:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.ColorClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("integer:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.IntegerClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("percentage:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.PercentageClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("alpha:", StringComparison.Ordinal) || valueNoBrackets.StartsWith("number:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.FloatNumberClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("image:", StringComparison.Ordinal) || valueNoBrackets.StartsWith("url:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.UrlClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("angle:", StringComparison.Ordinal) || valueNoBrackets.StartsWith("hue:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.AngleHueClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("duration:", StringComparison.Ordinal) || valueNoBrackets.StartsWith("time:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.DurationClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("flex:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.FlexClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("frequency:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.FrequencyClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("ratio:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.RatioClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("resolution:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.ResolutionClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("size:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.AbstractClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else if (valueNoBrackets.StartsWith("string:", StringComparison.Ordinal))
-                {
-                    AppRunner.Library.StringClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
-                else
-                {
-                    AppRunner.Library.AbstractClasses.TryGetValue(_prefix, out ClassDefinition);
-                }
+                AppRunner.Library.TryGetClassDefinition(_prefix, valueKind, out ClassDefinition);
 
                 if (ClassDefinition is not null)
                 {
-                    valueNoBrackets = valueNoBrackets[(valueNoBrackets.IndexOf(':') + 1)..];
+                    valueNoBrackets = valueNoBrackets[(typeSeparator + 1)..];
                     
-                    Value = valueNoBrackets.StartsWith("--", StringComparison.Ordinal) ? $"var({valueNoBrackets})" : valueNoBrackets;
+                    Value = valueNoBrackets.StartsWith("--", StringComparison.Ordinal) && valueNoBrackets.Contains('(') == false
+                        ? $"var({valueNoBrackets})"
+                        : valueNoBrackets;
                     IsValid = true;
                     SelectorSort = ClassDefinition.SelectorSort;
 
@@ -469,37 +335,15 @@ public sealed class CssClass : IDisposable
             
             if (HasArbitraryValueWithCssCustomProperty && ClassDefinition is null)
             {
-                // Iterate through all data type classes to find a prefix match
-
-                var classDictionaries = new List<PrefixTrie<ClassDefinition>>
-                {
-                    AppRunner.Library.LengthClasses,
-                    AppRunner.Library.ColorClasses,
-                    AppRunner.Library.PercentageClasses,
-                    AppRunner.Library.IntegerClasses,
-                    AppRunner.Library.FloatNumberClasses,
-                    AppRunner.Library.AngleHueClasses,
-                    AppRunner.Library.DurationClasses,
-                    AppRunner.Library.FrequencyClasses,
-                    AppRunner.Library.UrlClasses,
-                    AppRunner.Library.FlexClasses,
-                    AppRunner.Library.RatioClasses,
-                    AppRunner.Library.ResolutionClasses,
-                    AppRunner.Library.StringClasses,
-                    AppRunner.Library.AbstractClasses
-                };
-
-                foreach (var dict in classDictionaries)
-                {
-                    if (dict.TryGetValue(_prefix, out ClassDefinition))
-                        break;
-                }                
+                AppRunner.Library.TryGetUntypedCustomPropertyDefinition(_prefix, out ClassDefinition);
 
                 if (ClassDefinition is not null)
                 {
                     var valueNoBrackets = value.TrimStart('[').TrimStart('(').TrimEnd(')').TrimEnd(']').ProcessUnderscores();
 
-                    Value = valueNoBrackets.StartsWith("--", StringComparison.Ordinal) ? $"var({valueNoBrackets})" : valueNoBrackets;
+                    Value = valueNoBrackets.StartsWith("--", StringComparison.Ordinal) && valueNoBrackets.Contains('(') == false
+                        ? $"var({valueNoBrackets})"
+                        : valueNoBrackets;
                     IsValid = true;
                     SelectorSort = ClassDefinition.SelectorSort;
 
@@ -584,14 +428,12 @@ public sealed class CssClass : IDisposable
                 
                 if (ClassDefinition is not null)
                 {
-                    if (ClassDefinition.InColorCollection && HasModifierValue)
+                    if (ClassDefinition.Accepts(UtilityValueKinds.Color) && HasModifierValue)
                     {
-                        if (int.TryParse(ModifierValue, out var alphaPct))
-                            Value = valueNoBrackets.SetWebColorAlpha(alphaPct);
-                        else if (double.TryParse(ModifierValue, out var alpha))
-                            Value = valueNoBrackets.SetWebColorAlpha(alpha);
-                        else
-                            Value = valueNoBrackets;
+                        if (TryResolveOpacityPercentage(out var alphaPct) == false)
+                            return;
+
+                        Value = valueNoBrackets.SetWebColorAlphaByPercentage(alphaPct);
                     }
                     else
                     {
@@ -618,7 +460,10 @@ public sealed class CssClass : IDisposable
             {
                 AppRunner.Library.LengthClasses.TryGetValue(_prefix, out ClassDefinition);
 
-                if (ClassDefinition is null)
+                if (ClassDefinition?.HasBehavior(UtilityBehaviors.ArbitraryLengthOnly) ?? false)
+                    ClassDefinition = null;
+
+                if (ClassDefinition is null && int.TryParse(value, out _))
                     AppRunner.Library.IntegerClasses.TryGetValue(_prefix, out ClassDefinition);
 
                 if (ClassDefinition is null)
@@ -657,14 +502,8 @@ public sealed class CssClass : IDisposable
                     {
                         if (HasModifierValue)
                         {
-                            if (double.TryParse(ModifierValue, out var pct) == false)
-                                pct = 100;
-
-                            if (pct < 0)
-                                pct = 0;
-
-                            if (pct > 100)
-                                pct = 100;
+                            if (TryResolveOpacityPercentage(out var pct) == false)
+                                return;
                             
                             if (pct < 100)
                             {
@@ -674,9 +513,9 @@ public sealed class CssClass : IDisposable
                                 }
                                 else
                                 {
-                                    if (colorValue.Contains("oklch"))
+                                    if (colorValue.Contains("oklch", StringComparison.Ordinal))
                                         Value = $"color-mix(in oklab, var(--color-{value}) {pct}%, transparent)";
-                                    else if (colorValue.Contains("rgb") || colorValue.Contains('#'))
+                                    else if (colorValue.Contains("rgb", StringComparison.Ordinal) || colorValue.Contains('#'))
                                         Value = $"color-mix(in srgb, var(--color-{value}) {pct}%, transparent)";
                                     else
                                     {
@@ -713,9 +552,42 @@ public sealed class CssClass : IDisposable
         {
             IsValid = false;
         }
+
+        return;
+
+        static bool IsValidFractionPart(string text, double number)
+        {
+            return number >= 0 && number % 0.25 == 0 && number.ToString("0.############", CultureInfo.InvariantCulture) == text;
+        }
     }
 
-    public void GenerateSelector()
+    private bool TryResolveOpacityPercentage(out double percentage)
+    {
+        percentage = 0;
+
+        if (HasArbitraryModifierValue)
+        {
+            if (ModifierValue.EndsWith('%'))
+                return double.TryParse(ModifierValue.AsSpan(0, ModifierValue.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out percentage);
+
+            if (double.TryParse(ModifierValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var alpha) == false)
+                return false;
+
+            percentage = alpha * 100;
+            return true;
+        }
+
+        if (double.TryParse(ModifierValue, NumberStyles.Float, CultureInfo.InvariantCulture, out percentage) == false)
+            return false;
+
+        return percentage >= 0
+            && percentage % 0.25 == 0
+            && percentage.ToString("0.############", CultureInfo.InvariantCulture) == ModifierValue;
+    }
+
+    public void GenerateSelector() => CssRuleEmitter.GenerateSelector(this);
+
+    internal void GenerateSelectorCore()
     {
         try
         {
@@ -821,7 +693,9 @@ public sealed class CssClass : IDisposable
         }
     }
 
-    public void GenerateWrappers()
+    public void GenerateWrappers() => CssRuleEmitter.GenerateWrappers(this);
+
+    internal void GenerateWrappersCore()
     {
         var variantCount = VariantSegments.Count;
 
@@ -975,10 +849,31 @@ public sealed class CssClass : IDisposable
         Wrappers.Add(Sb.Fnv1AHash64(), Sb.ToString());
     }
 
-    public void GenerateStyles(bool useArbitraryValue = false)
+    public void GenerateStyles(bool useArbitraryValue = false) => CssRuleEmitter.GenerateStyles(this, useArbitraryValue);
+
+    internal void GenerateStylesCore(bool useArbitraryValue = false)
     {
         if (ClassDefinition is null)
             return;
+
+        if (HasModifierValue && ClassDefinition.HasBehavior(UtilityBehaviors.SlashModifier) == false && ClassDefinition.Accepts(UtilityValueKinds.Color) == false && useArbitraryValue == false)
+        {
+            IsValid = false;
+            Styles = string.Empty;
+            return;
+        }
+
+        var opacityPercentage = 0d;
+
+        if (HasModifierValue && ClassDefinition.HasBehavior(UtilityBehaviors.OpacityModifier) && TryResolveOpacityPercentage(out opacityPercentage) == false)
+        {
+            IsValid = false;
+            Styles = string.Empty;
+            return;
+        }
+
+        if (HasModifierValue && ClassDefinition.HasBehavior(UtilityBehaviors.OpacityModifier) && HasArbitraryModifierValue)
+            ModifierValue = $"{opacityPercentage.ToString("0.############", CultureInfo.InvariantCulture)}%";
 
         Styles = ClassDefinition.Template;
 
@@ -1036,7 +931,7 @@ public sealed class CssClass : IDisposable
                     continue;
                 }
 
-                if (hasMaxBreakpoint == false && AllSegments[i].StartsWith("max-") && AppRunner.AppRunnerSettings.BreakpointSizes.ContainsKey(AllSegments[i].TrimStart("max-") ?? string.Empty))
+                if (hasMaxBreakpoint == false && AllSegments[i].StartsWith("max-", StringComparison.Ordinal) && AppRunner.AppRunnerSettings.BreakpointSizes.ContainsKey(AllSegments[i].TrimStart("max-") ?? string.Empty))
                     hasMaxBreakpoint = true;
             }
             
@@ -1061,7 +956,7 @@ public sealed class CssClass : IDisposable
 
         if (IsImportant)
         {
-            if (Styles.Contains("--") == false)
+            if (Styles.Contains("--", StringComparison.Ordinal) == false)
             {
                 Styles = Styles.Replace(";", " !important;", StringComparison.Ordinal);
             }
@@ -1073,7 +968,7 @@ public sealed class CssClass : IDisposable
                     
                 foreach (var split in splits)
                 {
-                    if (split.Trim().StartsWith("--"))
+                    if (split.Trim().StartsWith("--", StringComparison.Ordinal))
                         Styles += split.Trim() + ';' + AppRunner.AppRunnerSettings.LineBreak;
                     else
                         Styles += split.Trim() + " !important;" + AppRunner.AppRunnerSettings.LineBreak;
@@ -1084,6 +979,9 @@ public sealed class CssClass : IDisposable
         }
 
         Styles = Styles.Replace("calc(var(--spacing) * 0)", "0", StringComparison.Ordinal);
+
+        if (Value == "1")
+            Styles = Styles.Replace("calc(var(--spacing) * 1)", "var(--spacing)", StringComparison.Ordinal);
     }
 
     #endregion

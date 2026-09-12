@@ -44,8 +44,11 @@ msbuild.wrn
 # VS Code
 .vscode/*.*
 
+/Sfumato.Tests/colors.json
+/Sfumato.Tests/utility-classes.json
+/Sfumato.Tests/css-custom-properties.json
+/Sfumato.Tests/variants.json
+/BenchmarkDotNet.Artifacts/
+/benchmark.log
+/.testagent
 fynydd-attribution.sh
-/Fynydd.Sfumato.Tests/colors.json
-/Fynydd.Sfumato.Tests/utility-classes.json
-/Fynydd.Sfumato.Tests/css-custom-properties.json
-/Fynydd.Sfumato.Tests/variants.json
