@@ -31,12 +31,214 @@ public static class VariantValidators
 
         return null;
     }
-    
+
+    /// <summary>
+    /// Resolves the value portion of an aria variant into its attribute selector suffix.
+    /// Accepts a standard boolean name (e.g. "checked") or an arbitrary value
+    /// (e.g. "[sort=ascending]", "[current]"). Returns null when the value is invalid.
+    /// </summary>
+    private static string? GetAriaSelectorSuffix(AppRunner appRunner, string ariaValue)
+    {
+        if (ariaValue.Length == 0)
+            return null;
+
+        // Arbitrary value: [sort=ascending], [current], etc.
+        if (ariaValue[0] == '[' && ariaValue[^1] == ']')
+        {
+            var inner = ariaValue[1..^1].ProcessUnderscores();
+
+            if (inner.Length == 0)
+                return null;
+
+            var eqIndex = inner.IndexOf('=');
+
+            // [sort=ascending] -> [aria-sort="ascending"] ; [current] -> [aria-current]
+            return eqIndex >= 0
+                ? $"[aria-{inner[..eqIndex]}=\"{inner[(eqIndex + 1)..]}\"]"
+                : $"[aria-{inner}]";
+        }
+
+        // Standard boolean aria variant: look up "aria-{value}" (e.g. aria-checked).
+        if (appRunner.Library.PseudoclassPrefixes.TryGetValue($"aria-{ariaValue}", out var pseudoClass))
+            return pseudoClass.SelectorSuffix;
+
+        return null;
+    }
+
+    private static string? NegateArbitraryAtRule(string value)
+    {
+        // value is a processed at-rule like "@media print", "@supports (display: grid)",
+        // or "@container card style(--c)". Returns the negated at-rule statement, or
+        // null when the at-rule cannot be negated.
+
+        if (value.StartsWith("@media", StringComparison.Ordinal))
+        {
+            var condition = value[6..].Trim();
+
+            return condition.Length > 0 ? $"@media {AppRunnerExtensions.NegateConditionalStatement(condition)}" : null;
+        }
+
+        if (value.StartsWith("@supports", StringComparison.Ordinal))
+        {
+            var condition = value[9..].Trim();
+
+            return condition.Length > 0 ? $"@supports {AppRunnerExtensions.NegateConditionalStatement(condition)}" : null;
+        }
+
+        if (value.StartsWith("@container", StringComparison.Ordinal))
+        {
+            var condition = value[10..].Trim();
+
+            return condition.Length > 0 ? $"@container {AppRunnerExtensions.NegateContainerStatement(condition)}" : null;
+        }
+
+        return null;
+    }
+
+    private static string NormalizeNotSelectorParts(string selector)
+    {
+        var trailingComma = EndsWithTopLevelComma(selector);
+
+        var parts = 0;
+
+        foreach (var _ in selector.SplitByTopLevel(','))
+            parts++;
+
+        // The splitter drops a trailing empty part (e.g. "a," yields one
+        // part); Tailwind keeps it, so account for a top-level trailing comma.
+
+        if (trailingComma)
+            parts++;
+
+        if (parts == 1)
+            return NormalizeNotSelectorPart(selector);
+
+        var sb = new StringBuilder(selector.Length + parts);
+        var appendedParts = 0;
+
+        foreach (var part in selector.SplitByTopLevel(','))
+        {
+            if (appendedParts++ > 0)
+                sb.Append(", ");
+
+            sb.Append(NormalizeNotSelectorPart(part.ToString()));
+        }
+
+        // Append the trailing empty part dropped by the splitter.
+
+        if (trailingComma)
+            sb.Append(", ");
+
+        return sb.ToString();
+    }
+
+    private static bool EndsWithTopLevelComma(string selector)
+    {
+        if (selector.Length == 0 || selector[^1] != ',')
+            return false;
+
+        var bracketDepth = 0;
+        var parenDepth = 0;
+
+        for (var i = 0; i < selector.Length - 1; i++)
+        {
+            var c = selector[i];
+
+            if (c == '[') bracketDepth++;
+            else if (c == ']') bracketDepth--;
+            else if (c == '(') parenDepth++;
+            else if (c == ')') parenDepth--;
+        }
+
+        return bracketDepth == 0 && parenDepth == 0;
+    }
+
+    private static string NormalizeNotSelectorPart(string part)
+    {
+        var span = part.AsSpan();
+
+        // A universal selector directly followed by a pseudo-class, class, id
+        // or attribute is dropped (lightningcss normalization). Leading
+        // whitespace does not prevent the drop.
+
+        var k = 0;
+
+        while (k < span.Length && char.IsWhiteSpace(span[k]))
+            k++;
+
+        if (span.Length - k > 1 && span[k] == '*' && span[k + 1] is ':' or '.' or '#' or '[')
+            span = span[(k + 1)..];
+
+        // Normalize top-level combinator spacing to a single space on each side
+        // and collapse whitespace runs (lightningcss serialization).
+
+        var sb = new StringBuilder(span.Length + 4);
+        var bracketDepth = 0;
+        var parenDepth = 0;
+
+        for (var i = 0; i < span.Length; i++)
+        {
+            var c = span[i];
+
+            if (c == '[') bracketDepth++;
+            else if (c == ']') bracketDepth--;
+            else if (c == '(') parenDepth++;
+            else if (c == ')') parenDepth--;
+
+            // Combinators and whitespace inside brackets or parentheses are part
+            // of an attribute value or pseudo-class argument and are left
+            // untouched.
+
+            if (bracketDepth > 0 || parenDepth > 0)
+            {
+                sb.Append(c);
+
+                continue;
+            }
+
+            if (c is '>' or '+' or '~')
+            {
+                while (sb.Length > 0 && char.IsWhiteSpace(sb[^1]))
+                    sb.Length--;
+
+                var j = i + 1;
+
+                while (j < span.Length && char.IsWhiteSpace(span[j]))
+                    j++;
+
+                sb.Append(' ').Append(c).Append(' ');
+
+                i = j - 1;
+
+                continue;
+            }
+
+            if (char.IsWhiteSpace(c))
+            {
+                var j = i + 1;
+
+                while (j < span.Length && char.IsWhiteSpace(span[j]))
+                    j++;
+
+                if (sb.Length > 0)
+                    sb.Append(' ');
+
+                i = j - 1;
+
+                continue;
+            }
+
+            sb.Append(c);
+        }
+
+        return sb.ToString();
+    }
+
     public static bool TryGetVariant(this string variant, AppRunner appRunner, out VariantMetadata? metadata)
     {
         metadata = null;
         
-        var indexOfSlash = variant.LastIndexOf('/');
+        var indexOfSlash = variant.LastIndexOfTopLevel('/');
         var isContainerQuery = variant[0] == '@'; // true if a container query
 
         if (appRunner.Library.AllVariants.TryGetLongestMatchingPrefix(indexOfSlash > -1 ? variant[..indexOfSlash] : variant, out var prefix, out var variantMetadata))
@@ -104,6 +306,24 @@ public static class VariantValidators
             {
                 var variantValue = indexOfSlash > 0 ? variant[..indexOfSlash] : variant;
 
+                if (indexOfSlash == variant.Length - 1)
+                    return false;
+
+                if (prefix is not null
+                    && variantValue.Length > prefix.Length + 1
+                    && variantValue[prefix.Length] == '['
+                    && variantValue[^1] == ']'
+                    && variantMetadata.Statement.Contains("{0}", StringComparison.Ordinal))
+                {
+                    var customValue = GetCustomValue(variantValue);
+
+                    if (string.IsNullOrWhiteSpace(customValue))
+                        return false;
+
+                    metadata!.Statement = variantMetadata.Statement.Replace("{0}", customValue, StringComparison.Ordinal);
+                    return true;
+                }
+
                 return appRunner.Library.ContainerQueryPrefixes.TryGetValue(variantValue, out metadata);
             }
 
@@ -169,6 +389,102 @@ public static class VariantValidators
             
             #endregion
             
+            #region ARIA attributes
+
+            if (variant.Length > 9 && variant.StartsWith("not-aria-", StringComparison.Ordinal))
+            {
+                // not-aria-[sort=ascending]: (standard not-aria-* are auto-generated in Library)
+
+                var ariaSelector = GetAriaSelectorSuffix(appRunner, variant[9..]);
+
+                if (ariaSelector is null)
+                    return false;
+
+                metadata!.SelectorSuffix = $":not({ariaSelector})";
+
+                return true;
+            }
+
+            if (variant.Length > 5 && variant.StartsWith("aria-", StringComparison.Ordinal))
+            {
+                // aria-[sort=ascending]: or aria-[current]: (standard aria-* are exact trie matches)
+
+                var ariaSelector = GetAriaSelectorSuffix(appRunner, variant[5..]);
+
+                if (ariaSelector is null)
+                    return false;
+
+                metadata!.SelectorSuffix = ariaSelector;
+
+                return true;
+            }
+
+            #endregion
+            
+            #region Not arbitrary (not-[...])
+
+            if (variant.Length > 6 && variant.StartsWith("not-[", StringComparison.Ordinal))
+            {
+                // not-* variants do not accept modifiers (Tailwind emits nothing for them).
+
+                if (indexOfSlash > variant.LastIndexOf(']'))
+                    return false;
+
+                var customValue = GetBracketValue(variant);
+
+                if (customValue is null || customValue.Trim().Length < 1)
+                    return false;
+
+                if (customValue[0] == '@')
+                {
+                    // not-[@media_print]:, not-[@supports(display:grid)]:, not-[@container_style(--a)]:
+                    // Negate the at-rule condition and emit it as a wrapper.
+
+                    var negatedStatement = NegateArbitraryAtRule(customValue);
+
+                    if (negatedStatement is null)
+                        return false;
+
+                    metadata!.PrefixType = "wrapper";
+                    metadata.PrefixOrder = appRunner.Library.SupportsQueryPrefixes.Count + 1;
+                    metadata.Statement = negatedStatement;
+
+                    return true;
+                }
+
+                // not-[:checked]:, not-[.group]:, not-[&:hover]: etc.
+                // Negate an arbitrary selector by wrapping it in :not(...).
+
+                var selector = customValue;
+
+                // Pseudo-elements cannot be negated (Tailwind emits nothing for them).
+                if (selector.Contains("::", StringComparison.Ordinal))
+                    return false;
+
+                // Relative combinators cannot be negated (Tailwind emits nothing for them).
+                if (selector[0] is '>' or '+' or '~')
+                    return false;
+
+                var hasAmpersand = selector.Contains('&', StringComparison.Ordinal);
+
+                // Each & refers to the element itself (*).
+                if (hasAmpersand)
+                    selector = selector.Replace("&", "*", StringComparison.Ordinal);
+
+                // Normalize top-level comma-separated parts (Tailwind serializes selector
+                // lists with ", ") and drop a universal selector that is directly followed
+                // by a pseudo-class, class, id or attribute (lightningcss normalization).
+
+                var normalized = NormalizeNotSelectorParts(selector);
+
+                // Values without & are wrapped in :is() (Tailwind behavior).
+                metadata!.SelectorSuffix = hasAmpersand ? $":not({normalized})" : $":not(:is({normalized}))";
+
+                return true;
+            }
+
+            #endregion
+            
             #region Groups
             
             if (variant.Length > 12 && variant.StartsWith("group-has-[", StringComparison.Ordinal))
@@ -183,16 +499,16 @@ public static class VariantValidators
             
             if (variant.Length > 11 && variant.StartsWith("group-aria-", StringComparison.Ordinal))
             {
-                // group-aria-checked:
+                // group-aria-checked: or group-aria-[sort=ascending]: etc.
 
-                var variantValue = variant[11..];
+                var ariaSelector = GetAriaSelectorSuffix(appRunner, variant[11..]);
 
-                if (appRunner.Library.PseudoclassPrefixes.TryGetValue(variantValue, out var pseudoClass) == false)
+                if (ariaSelector is null)
                     return false;
 
-                metadata!.SelectorSuffix = $":is(:where(.group{pseudoClass.SelectorSuffix}) *)";
+                metadata!.SelectorSuffix = $":is(:where(.group){ariaSelector} *)";
                 metadata.PrioritySort = 99;
-                
+
                 return true;
             }
             
@@ -222,6 +538,9 @@ public static class VariantValidators
                 {
                     // group-hover:
 
+                    if (pseudoClass.SelectorSuffix.StartsWith("::", StringComparison.Ordinal))
+                        return false;
+
                     metadata!.PrefixType = "prefix";
                     metadata.SelectorPrefix = $".group{slashValue.Replace("/", "\\/")}{pseudoClass.SelectorSuffix} ";
                 
@@ -247,14 +566,14 @@ public static class VariantValidators
             
             if (variant.Length > 10 && variant.StartsWith("peer-aria-", StringComparison.Ordinal))
             {
-                // peer-aria-checked:
+                // peer-aria-checked: or peer-aria-[sort=descending]: etc.
 
-                var variantValue = variant[10..];
+                var ariaSelector = GetAriaSelectorSuffix(appRunner, variant[10..]);
 
-                if (appRunner.Library.PseudoclassPrefixes.TryGetValue(variantValue, out var pseudoClass) == false)
+                if (ariaSelector is null)
                     return false;
 
-                metadata!.SelectorSuffix = $":is(:where(.peer{pseudoClass.SelectorSuffix}) ~ *)";
+                metadata!.SelectorSuffix = $":is(:where(.peer){ariaSelector} ~ *)";
                 metadata.PrioritySort = 99;
 
                 return true;
@@ -281,6 +600,9 @@ public static class VariantValidators
                 {
                     // peer-hover:
 
+                    if (pseudoClass.SelectorSuffix.StartsWith("::", StringComparison.Ordinal))
+                        return false;
+
                     metadata!.PrefixType = "prefix";
                     metadata.SelectorPrefix = $".peer{slashValue.Replace("/", "\\/")}{pseudoClass.SelectorSuffix} ~ ";
 
@@ -290,6 +612,38 @@ public static class VariantValidators
                 return false;
             }
             
+            #endregion
+            
+            #region Implicit group (in-*)
+
+            if (variant.Length > 3 && variant.StartsWith("in-", StringComparison.Ordinal))
+            {
+                // in-hover: in-focus: etc. — implicit group variants (no .group class required)
+
+                var innerVariant = variant[3..];
+
+                // in-not-* is not supported (Tailwind emits nothing for it)
+                if (innerVariant.StartsWith("not-", StringComparison.Ordinal))
+                    return false;
+
+                // Resolve the inner variant to obtain its selector suffix.
+                if (innerVariant.TryGetVariant(appRunner, out var innerMetadata) == false || innerMetadata is null)
+                    return false;
+
+                // Only selector-based (pseudo-class / attribute) variants are compatible with in-*.
+                if (innerMetadata.PrefixType != "pseudoclass" || innerMetadata.SelectorSuffix.Length == 0)
+                    return false;
+
+                // Pseudo-elements (::before, ::after, ...) are not compatible (Tailwind emits nothing for them).
+                if (innerMetadata.SelectorSuffix.StartsWith("::", StringComparison.Ordinal))
+                    return false;
+
+                metadata!.PrefixType = "prefix";
+                metadata.SelectorPrefix = $":where({innerMetadata.SelectorSuffix}) ";
+
+                return true;
+            }
+
             #endregion
 
             #region Has
@@ -310,6 +664,9 @@ public static class VariantValidators
                 var variantValue = variant[4..];
 
                 if (appRunner.Library.PseudoclassPrefixes.TryGetValue(variantValue, out var pseudoClass) == false)
+                    return false;
+
+                if (pseudoClass.SelectorSuffix.StartsWith("::", StringComparison.Ordinal))
                     return false;
 
                 metadata!.SelectorSuffix = $":has({pseudoClass.SelectorSuffix})";

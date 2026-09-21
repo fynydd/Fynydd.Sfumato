@@ -216,6 +216,14 @@ public static class LibraryPseudoClasses
 		    }
 	    },
 	    {
+		    "optional",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SelectorSuffix = ":optional"
+		    }
+	    },
+	    {
 		    "required",
 		    new VariantMetadata
 		    {
@@ -240,6 +248,22 @@ public static class LibraryPseudoClasses
 		    }
 	    },
 	    {
+		    "user-valid",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SelectorSuffix = ":user-valid"
+		    }
+	    },
+	    {
+		    "user-invalid",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SelectorSuffix = ":user-invalid"
+		    }
+	    },
+	    {
 		    "in-range",
 		    new VariantMetadata
 		    {
@@ -261,6 +285,14 @@ public static class LibraryPseudoClasses
 		    {
 			    PrefixType = "pseudoclass",
 			    SelectorSuffix = ":placeholder-shown"
+		    }
+	    },
+	    {
+		    "details-content",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SelectorSuffix = "::details-content"
 		    }
 	    },
 	    {
@@ -398,6 +430,17 @@ public static class LibraryPseudoClasses
 		    }
 	    },
 	    {
+		    // Prefix for the arbitrary aria-[...] variant (e.g. aria-[sort=ascending]).
+		    // Standard boolean forms (aria-checked, ...) are exact matches above; this
+		    // prefix routes the bracketed form to the special-case resolver.
+		    "aria-",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SpecialCase = true
+		    }
+	    },
+	    {
 		    "aria-busy",
 		    new VariantMetadata
 		    {
@@ -495,6 +538,15 @@ public static class LibraryPseudoClasses
 		    }
 	    },
 	    {
+		    "not-",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SpecialCase = true,
+			    SelectorSuffix = "{0}",
+		    }
+	    },
+	    {
 		    "group-has-",
 		    new VariantMetadata
 		    {
@@ -544,6 +596,14 @@ public static class LibraryPseudoClasses
 	    },
 	    {
 		    "has-",
+		    new VariantMetadata
+		    {
+			    PrefixType = "pseudoclass",
+			    SpecialCase = true
+		    }
+	    },
+	    {
+		    "in-",
 		    new VariantMetadata
 		    {
 			    PrefixType = "pseudoclass",

@@ -155,6 +155,18 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
+  "aria-": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": true,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
   "aria-busy": {
     "prefixOrder": 0,
     "prefixType": "pseudoclass",
@@ -371,12 +383,12 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
-  "out-of-range": {
+  "optional": {
     "prefixOrder": 0,
     "prefixType": "pseudoclass",
     "statement": "",
     "selectorPrefix": "",
-    "selectorSuffix": ":out-of-range",
+    "selectorSuffix": ":optional",
     "inheritable": false,
     "specialCase": false,
     "canHaveNumericSuffix": false,
@@ -394,6 +406,18 @@
     "canHaveNumericSuffix": false,
     "isRazorSyntax": false,
     "prioritySort": 99
+  },
+  "out-of-range": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": ":out-of-range",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
   },
   "even": {
     "prefixOrder": 0,
@@ -476,6 +500,18 @@
     "inheritable": true,
     "specialCase": false,
     "canHaveNumericSuffix": true,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "not-": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": "{0}",
+    "inheritable": false,
+    "specialCase": true,
+    "canHaveNumericSuffix": false,
     "isRazorSyntax": false,
     "prioritySort": 0
   },
@@ -563,42 +599,6 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
-  "not-first-letter": {
-    "prefixOrder": 0,
-    "prefixType": "pseudoclass",
-    "statement": "",
-    "selectorPrefix": "",
-    "selectorSuffix": ":not(::first-letter)",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "not-first-line": {
-    "prefixOrder": 0,
-    "prefixType": "pseudoclass",
-    "statement": "",
-    "selectorPrefix": "",
-    "selectorSuffix": ":not(::first-line)",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "not-file": {
-    "prefixOrder": 0,
-    "prefixType": "pseudoclass",
-    "statement": "",
-    "selectorPrefix": "",
-    "selectorSuffix": ":not(::file-selector-button)",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
   "not-active": {
     "prefixOrder": 0,
     "prefixType": "pseudoclass",
@@ -623,14 +623,14 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
-  "not-after": {
+  "not-aria-": {
     "prefixOrder": 0,
     "prefixType": "pseudoclass",
     "statement": "",
     "selectorPrefix": "",
-    "selectorSuffix": ":not(::after)",
+    "selectorSuffix": ":not()",
     "inheritable": false,
-    "specialCase": false,
+    "specialCase": true,
     "canHaveNumericSuffix": false,
     "isRazorSyntax": false,
     "prioritySort": 0
@@ -851,12 +851,12 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
-  "not-out-of-range": {
+  "not-optional": {
     "prefixOrder": 0,
     "prefixType": "pseudoclass",
     "statement": "",
     "selectorPrefix": "",
-    "selectorSuffix": ":not(:out-of-range)",
+    "selectorSuffix": ":not(:optional)",
     "inheritable": false,
     "specialCase": false,
     "canHaveNumericSuffix": false,
@@ -874,6 +874,18 @@
     "canHaveNumericSuffix": false,
     "isRazorSyntax": false,
     "prioritySort": 99
+  },
+  "not-out-of-range": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": ":not(:out-of-range)",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
   },
   "not-even": {
     "prefixOrder": 0,
@@ -1043,6 +1055,18 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
+  "not-in-": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": ":not()",
+    "inheritable": false,
+    "specialCase": true,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
   "not-in-range": {
     "prefixOrder": 0,
     "prefixType": "pseudoclass",
@@ -1103,12 +1127,24 @@
     "isRazorSyntax": false,
     "prioritySort": 99
   },
-  "not-placeholder": {
+  "not-user-valid": {
     "prefixOrder": 0,
     "prefixType": "pseudoclass",
     "statement": "",
     "selectorPrefix": "",
-    "selectorSuffix": ":not(::placeholder)",
+    "selectorSuffix": ":not(:user-valid)",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "not-user-invalid": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": ":not(:user-invalid)",
     "inheritable": false,
     "specialCase": false,
     "canHaveNumericSuffix": false,
@@ -1159,54 +1195,6 @@
     "selectorSuffix": "[not-peer-aria-*] /* (e.g. [sort=ascending] for aria-sort=\u0022ascending\u0022) */",
     "inheritable": false,
     "specialCase": true,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "not-before": {
-    "prefixOrder": 0,
-    "prefixType": "pseudoclass",
-    "statement": "",
-    "selectorPrefix": "",
-    "selectorSuffix": ":not(::before)",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "not-backdrop": {
-    "prefixOrder": 0,
-    "prefixType": "pseudoclass",
-    "statement": "",
-    "selectorPrefix": "",
-    "selectorSuffix": ":not(::backdrop)",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "not-marker": {
-    "prefixOrder": 0,
-    "prefixType": "pseudoclass",
-    "statement": "",
-    "selectorPrefix": "",
-    "selectorSuffix": ":not(::marker)",
-    "inheritable": true,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "not-selection": {
-    "prefixOrder": 0,
-    "prefixType": "pseudoclass",
-    "statement": "",
-    "selectorPrefix": "",
-    "selectorSuffix": ":not(::selection)",
-    "inheritable": true,
-    "specialCase": false,
     "canHaveNumericSuffix": false,
     "isRazorSyntax": false,
     "prioritySort": 0
@@ -1265,6 +1253,18 @@
     "statement": "",
     "selectorPrefix": "",
     "selectorSuffix": ":default",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "details-content": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": "::details-content",
     "inheritable": false,
     "specialCase": false,
     "canHaveNumericSuffix": false,
@@ -1331,6 +1331,18 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
+  "in-": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": "[in-*] /* implicit group, e.g. in-hover (no .group class required) */",
+    "inheritable": false,
+    "specialCase": true,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
   "in-range": {
     "prefixOrder": 0,
     "prefixType": "pseudoclass",
@@ -1390,6 +1402,30 @@
     "canHaveNumericSuffix": false,
     "isRazorSyntax": false,
     "prioritySort": 99
+  },
+  "user-valid": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": ":user-valid",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "user-invalid": {
+    "prefixOrder": 0,
+    "prefixType": "pseudoclass",
+    "statement": "",
+    "selectorPrefix": "",
+    "selectorSuffix": ":user-invalid",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
   },
   "placeholder": {
     "prefixOrder": 0,
@@ -1895,6 +1931,114 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
+  "contrast-more": {
+    "prefixOrder": 77500,
+    "prefixType": "media",
+    "statement": "(prefers-contrast: more)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "contrast-less": {
+    "prefixOrder": 77500,
+    "prefixType": "media",
+    "statement": "(prefers-contrast: less)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "not-contrast-more": {
+    "prefixOrder": 77500,
+    "prefixType": "media",
+    "statement": "not (prefers-contrast: more)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "not-contrast-less": {
+    "prefixOrder": 77500,
+    "prefixType": "media",
+    "statement": "not (prefers-contrast: less)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "not-forced-colors": {
+    "prefixOrder": 77000,
+    "prefixType": "media",
+    "statement": "not (forced-colors: active)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "not-inverted-colors": {
+    "prefixOrder": 76500,
+    "prefixType": "media",
+    "statement": "not (inverted-colors: inverted)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "noscript": {
+    "prefixOrder": 75000,
+    "prefixType": "media",
+    "statement": "(scripting: none)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "forced-colors": {
+    "prefixOrder": 77000,
+    "prefixType": "media",
+    "statement": "(forced-colors: active)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "inverted-colors": {
+    "prefixOrder": 76500,
+    "prefixType": "media",
+    "statement": "(inverted-colors: inverted)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
   "any-pointer-fine": {
     "prefixOrder": 75000,
     "prefixType": "media",
@@ -1923,18 +2067,6 @@
     "prefixOrder": 75000,
     "prefixType": "media",
     "statement": "(any-pointer: none)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "noscript": {
-    "prefixOrder": 75000,
-    "prefixType": "media",
-    "statement": "(scripting: none)",
     "selectorPrefix": "",
     "selectorSuffix": "",
     "inheritable": false,
@@ -2075,10 +2207,34 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
-  "@3xs": {
-    "prefixOrder": 2500,
+  "@min-": {
+    "prefixOrder": 70000,
     "prefixType": "container",
-    "statement": "(width \u003E= 16rem)",
+    "statement": "(width \u003E= {0})",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": true,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-": {
+    "prefixOrder": 70100,
+    "prefixType": "container",
+    "statement": "(width \u003C {0})",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": true,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-3xs": {
+    "prefixOrder": 2600,
+    "prefixType": "container",
+    "statement": "(width \u003C 16rem)",
     "selectorPrefix": "",
     "selectorSuffix": "",
     "inheritable": false,
@@ -2087,10 +2243,10 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
-  "@3xl": {
-    "prefixOrder": 4100,
+  "@max-3xl": {
+    "prefixOrder": 4200,
     "prefixType": "container",
-    "statement": "(width \u003E= 48rem)",
+    "statement": "(width \u003C 48rem)",
     "selectorPrefix": "",
     "selectorSuffix": "",
     "inheritable": false,
@@ -2099,26 +2255,170 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
-  "@@3xs": {
-    "prefixOrder": 2500,
+  "@max-2xs": {
+    "prefixOrder": 2800,
     "prefixType": "container",
-    "statement": "(width \u003E= 16rem)",
+    "statement": "(width \u003C 18rem)",
     "selectorPrefix": "",
     "selectorSuffix": "",
     "inheritable": false,
     "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-2xl": {
+    "prefixOrder": 4000,
+    "prefixType": "container",
+    "statement": "(width \u003C 42rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-xs": {
+    "prefixOrder": 3000,
+    "prefixType": "container",
+    "statement": "(width \u003C 20rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-xl": {
+    "prefixOrder": 3800,
+    "prefixType": "container",
+    "statement": "(width \u003C 36rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-sm": {
+    "prefixOrder": 3200,
+    "prefixType": "container",
+    "statement": "(width \u003C 24rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-md": {
+    "prefixOrder": 3400,
+    "prefixType": "container",
+    "statement": "(width \u003C 28rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-lg": {
+    "prefixOrder": 3600,
+    "prefixType": "container",
+    "statement": "(width \u003C 32rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-4xl": {
+    "prefixOrder": 4400,
+    "prefixType": "container",
+    "statement": "(width \u003C 56rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-5xl": {
+    "prefixOrder": 4600,
+    "prefixType": "container",
+    "statement": "(width \u003C 64rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-6xl": {
+    "prefixOrder": 4800,
+    "prefixType": "container",
+    "statement": "(width \u003C 72rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@max-7xl": {
+    "prefixOrder": 5000,
+    "prefixType": "container",
+    "statement": "(width \u003C 80rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@md": {
+    "prefixOrder": 3300,
+    "prefixType": "container",
+    "statement": "(width \u003E= 28rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": false,
+    "prioritySort": 0
+  },
+  "@@min-": {
+    "prefixOrder": 70000,
+    "prefixType": "container",
+    "statement": "(width \u003E= {0})",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": true,
     "canHaveNumericSuffix": false,
     "isRazorSyntax": true,
     "prioritySort": 0
   },
-  "@@3xl": {
-    "prefixOrder": 4100,
+  "@@max-": {
+    "prefixOrder": 70100,
     "prefixType": "container",
-    "statement": "(width \u003E= 48rem)",
+    "statement": "(width \u003C {0})",
     "selectorPrefix": "",
     "selectorSuffix": "",
     "inheritable": false,
-    "specialCase": false,
+    "specialCase": true,
     "canHaveNumericSuffix": false,
     "isRazorSyntax": true,
     "prioritySort": 0
@@ -2291,6 +2591,30 @@
     "isRazorSyntax": true,
     "prioritySort": 0
   },
+  "@@3xs": {
+    "prefixOrder": 2500,
+    "prefixType": "container",
+    "statement": "(width \u003E= 16rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": true,
+    "prioritySort": 0
+  },
+  "@@3xl": {
+    "prefixOrder": 4100,
+    "prefixType": "container",
+    "statement": "(width \u003E= 48rem)",
+    "selectorPrefix": "",
+    "selectorSuffix": "",
+    "inheritable": false,
+    "specialCase": false,
+    "canHaveNumericSuffix": false,
+    "isRazorSyntax": true,
+    "prioritySort": 0
+  },
   "@@2xs": {
     "prefixOrder": 2700,
     "prefixType": "container",
@@ -2411,10 +2735,10 @@
     "isRazorSyntax": true,
     "prioritySort": 0
   },
-  "@max-3xs": {
-    "prefixOrder": 2600,
+  "@3xs": {
+    "prefixOrder": 2500,
     "prefixType": "container",
-    "statement": "(width \u003C 16rem)",
+    "statement": "(width \u003E= 16rem)",
     "selectorPrefix": "",
     "selectorSuffix": "",
     "inheritable": false,
@@ -2423,154 +2747,10 @@
     "isRazorSyntax": false,
     "prioritySort": 0
   },
-  "@max-3xl": {
-    "prefixOrder": 4200,
+  "@3xl": {
+    "prefixOrder": 4100,
     "prefixType": "container",
-    "statement": "(width \u003C 48rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-2xs": {
-    "prefixOrder": 2800,
-    "prefixType": "container",
-    "statement": "(width \u003C 18rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-2xl": {
-    "prefixOrder": 4000,
-    "prefixType": "container",
-    "statement": "(width \u003C 42rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-xs": {
-    "prefixOrder": 3000,
-    "prefixType": "container",
-    "statement": "(width \u003C 20rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-xl": {
-    "prefixOrder": 3800,
-    "prefixType": "container",
-    "statement": "(width \u003C 36rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-sm": {
-    "prefixOrder": 3200,
-    "prefixType": "container",
-    "statement": "(width \u003C 24rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-md": {
-    "prefixOrder": 3400,
-    "prefixType": "container",
-    "statement": "(width \u003C 28rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-lg": {
-    "prefixOrder": 3600,
-    "prefixType": "container",
-    "statement": "(width \u003C 32rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-4xl": {
-    "prefixOrder": 4400,
-    "prefixType": "container",
-    "statement": "(width \u003C 56rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-5xl": {
-    "prefixOrder": 4600,
-    "prefixType": "container",
-    "statement": "(width \u003C 64rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-6xl": {
-    "prefixOrder": 4800,
-    "prefixType": "container",
-    "statement": "(width \u003C 72rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@max-7xl": {
-    "prefixOrder": 5000,
-    "prefixType": "container",
-    "statement": "(width \u003C 80rem)",
-    "selectorPrefix": "",
-    "selectorSuffix": "",
-    "inheritable": false,
-    "specialCase": false,
-    "canHaveNumericSuffix": false,
-    "isRazorSyntax": false,
-    "prioritySort": 0
-  },
-  "@md": {
-    "prefixOrder": 3300,
-    "prefixType": "container",
-    "statement": "(width \u003E= 28rem)",
+    "statement": "(width \u003E= 48rem)",
     "selectorPrefix": "",
     "selectorSuffix": "",
     "inheritable": false,
